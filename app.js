@@ -2,18 +2,19 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-// Firebase конфигурация (замените на ваши данные)
+// Firebase конфигурация
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDx9dHwNFuPMGSLFDJHgaH1vfE679ZPVD4",
+  authDomain: "miro-7014e.firebaseapp.com",
+  projectId: "miro-7014e",
+  storageBucket: "miro-7014e.firebasestorage.app",
+  messagingSenderId: "484715250794",
+  appId: "1:484715250794:web:51dac4a0311942176e3613",
+  measurementId: "G-GHCKM1FMLP"
 };
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
 
 // Основное приложение
 class TaskFlowApp {
@@ -71,6 +72,10 @@ class TaskFlowApp {
   async handleSignUp() {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
+    if (!email || !password) {
+      this.showError('Введите email и пароль');
+      return;
+    }
     try {
       await createUserWithEmailAndPassword(auth, email, password);
     } catch (err) {
@@ -81,6 +86,10 @@ class TaskFlowApp {
   async handleSignIn() {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
+    if (!email || !password) {
+      this.showError('Введите email и пароль');
+      return;
+    }
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
@@ -101,6 +110,7 @@ class TaskFlowApp {
     const errorDiv = document.getElementById('error');
     errorDiv.textContent = message;
     errorDiv.classList.remove('hidden');
+    setTimeout(() => errorDiv.classList.add('hidden'), 3000);
   }
 
   // Экран выбора доски
@@ -121,26 +131,38 @@ class TaskFlowApp {
   }
 
   async createBoard() {
-    const boardRef = doc(collection(db, 'boards'));
-    await setDoc(boardRef, {
-      admin: this.user.uid,
-      createdAt: serverTimestamp(),
-      roles: { [this.user.uid]: { name: 'Admin', color: '#FF0000', description: 'Администратор доски' } },
-      tasks: {}
-    });
-    this.boardId = boardRef.id;
-    this.render();
+    try {
+      const boardRef = doc(collection(db, 'boards'));
+      await setDoc(boardRef, {
+        admin: this.user.uid,
+        createdAt: serverTimestamp(),
+        roles: { [this.user.uid]: { name: 'Admin', color: '#FF0000', description: 'Администратор доски' } },
+        tasks: {}
+      });
+      this.boardId = boardRef.id;
+      this.render();
+    } catch (err) {
+      this.showError('Ошибка при создании доски: ' + err.message);
+    }
   }
 
   async joinBoard() {
     const inviteLink = document.getElementById('inviteLink').value;
+    if (!inviteLink) {
+      alert('Введите ссылку на доску!');
+      return;
+    }
     const boardId = inviteLink.split('/').pop();
-    const boardDoc = await getDoc(doc(db, 'boards', boardId));
-    if (boardDoc.exists()) {
-      this.boardId = boardId;
-      this.render();
-    } else {
-      alert('Недействительная ссылка!');
+    try {
+      const boardDoc = await getDoc(doc(db, 'boards', boardId));
+      if (boardDoc.exists()) {
+        this.boardId = boardId;
+        this.render();
+      } else {
+        alert('Недействительная ссылка!');
+      }
+    } catch (err) {
+      alert('Ошибка при присоединении: ' + err.message);
     }
   }
 
@@ -149,7 +171,7 @@ class TaskFlowApp {
     this.app.innerHTML = `
       <div class="board">
         <h1 class="text-3xl font-bold mb-4">Доска задач</h1>
-        <p class="mb-4">Ссылка на доску: ${window.location.origin}/board/${this.boardId}</p>
+        <p class="mb-4">Ссылка на доску: <a href="${window.location.origin}/board/${this.boardId}" class="text-blue-500">${window.location.origin}/board/${this.boardId}</a></p>
         <div id="adminControls" class="mb-8"></div>
         <div class="mb-8">
           <h2 class="text-xl font-bold mb-2">Добавить задачу</h2>
@@ -183,6 +205,9 @@ class TaskFlowApp {
     onSnapshot(doc(db, 'boards', this.boardId), (doc) => {
       this.boardData = doc.data();
       this.renderTasks();
+      this.renderAdminControls();
+    }, (err) => {
+      this.showError('Ошибка загрузки доски: ' + err.message);
     });
   }
 
@@ -197,6 +222,8 @@ class TaskFlowApp {
         <button id="addRole" class="bg-blue-500">Добавить роль</button>
       `;
       document.getElementById('addRole').addEventListener('click', () => this.addRole());
+    } else {
+      document.getElementById('adminControls').innerHTML = '';
     }
   }
 
@@ -204,17 +231,29 @@ class TaskFlowApp {
     const roleName = document.getElementById('roleName').value;
     const roleColor = document.getElementById('roleColor').value;
     const roleDesc = document.getElementById('roleDesc').value;
-    if (roleName && roleDesc) {
+    if (!roleName || !roleDesc) {
+      this.showError('Введите название и описание роли');
+      return;
+    }
+    try {
       await updateDoc(doc(db, 'boards', this.boardId), {
         [`roles.${this.user.uid}`]: { name: roleName, color: roleColor, description: roleDesc }
       });
+      document.getElementById('roleName').value = '';
+      document.getElementById('roleDesc').value = '';
+    } catch (err) {
+      this.showError('Ошибка добавления роли: ' + err.message);
     }
   }
 
   async addTask() {
     const title = document.getElementById('taskTitle').value;
     const description = document.getElementById('taskDesc').value;
-    if (title && description) {
+    if (!title || !description) {
+      this.showError('Введите название и описание задачи');
+      return;
+    }
+    try {
       const taskId = Date.now().toString();
       await updateDoc(doc(db, 'boards', this.boardId), {
         [`tasks.${taskId}`]: {
@@ -227,6 +266,8 @@ class TaskFlowApp {
       });
       document.getElementById('taskTitle').value = '';
       document.getElementById('taskDesc').value = '';
+    } catch (err) {
+      this.showError('Ошибка добавления задачи: ' + err.message);
     }
   }
 
@@ -277,6 +318,10 @@ class TaskFlowApp {
 
   // Экспорт доски в JSON
   exportBoard() {
+    if (!this.boardData) {
+      this.showError('Нет данных для экспорта');
+      return;
+    }
     const data = JSON.stringify(this.boardData, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -289,4 +334,4 @@ class TaskFlowApp {
 }
 
 // Запуск приложения
-const app = new TaskFlowApp();
+const taskFlowApp = new TaskFlowApp();
