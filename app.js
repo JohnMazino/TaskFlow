@@ -78,7 +78,6 @@ class TaskFlowApp {
     }
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      thisწ
       this.showNotification('Успешная регистрация!');
     } catch (err) {
       this.showError(err.message);
@@ -131,7 +130,7 @@ class TaskFlowApp {
         duration: 3000,
         gravity: "top",
         position: "right",
-        backgroundColor: "#b91c1c",
+        style: { background: "#b91c1c" }
       }).showToast();
     }
   }
@@ -142,7 +141,7 @@ class TaskFlowApp {
       duration: 3000,
       gravity: "top",
       position: "right",
-      backgroundColor: "#22c55e",
+      style: { background: "#22c55e" }
     }).showToast();
   }
 
@@ -237,6 +236,7 @@ class TaskFlowApp {
             <div id="doneBoard" class="droppable"></div>
           </div>
         </div>
+        <div id="modal" class="modal hidden"></div>
       </div>
     `;
 
@@ -345,6 +345,7 @@ class TaskFlowApp {
           <p class="text-gray-600">${task.description}</p>
           <p class="text-sm text-gray-500">Создано: ${task.createdBy === 'admin' ? 'Админ' : 'Вы'}</p>
           <p class="text-sm text-gray-500">Статус: ${task.status}</p>
+          <button class="edit-task bg-blue-500 hover:bg-blue-600 text-white text-sm px-2 py-1 rounded mt-2" data-id="${id}">Редактировать</button>
         `;
         if (task.status === 'To Do') {
           todoBoard.appendChild(taskEl);
@@ -353,7 +354,60 @@ class TaskFlowApp {
         } else if (task.status === 'Done') {
           doneBoard.appendChild(taskEl);
         }
+
+        taskEl.querySelector('.edit-task').addEventListener('click', () => this.openEditModal(id, task));
       });
+    }
+  }
+
+  // Открытие модального окна для редактирования
+  openEditModal(taskId, task) {
+    const modal = document.getElementById('modal');
+    modal.innerHTML = `
+      <div class="modal-content">
+        <h2 class="text-xl font-bold mb-4 text-gray-800">Редактировать задачу</h2>
+        <input id="editTitle" type="text" value="${task.title}" placeholder="Название задачи" class="mr-2">
+        <input id="editDesc" type="text" value="${task.description}" placeholder="Описание задачи" class="mr-2">
+        <select id="editStatus" class="mr-2">
+          <option value="To Do" ${task.status === 'To Do' ? 'selected' : ''}>To Do</option>
+          <option value="In Progress" ${task.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+          <option value="Done" ${task.status === 'Done' ? 'selected' : ''}>Done</option>
+        </select>
+        <div class="flex justify-end gap-2">
+          <button id="saveTask" class="bg-green-500 hover:bg-green-600">Сохранить</button>
+          <button id="cancelEdit" class="bg-gray-500 hover:bg-gray-600">Отмена</button>
+        </div>
+      </div>
+    `;
+    modal.classList.remove('hidden');
+
+    document.getElementById('saveTask').addEventListener('click', () => this.saveTask(taskId));
+    document.getElementById('cancelEdit').addEventListener('click', () => modal.classList.add('hidden'));
+  }
+
+  async saveTask(taskId) {
+    const title = document.getElementById('editTitle')?.value;
+    const description = document.getElementById('editDesc')?.value;
+    const status = document.getElementById('editStatus')?.value;
+    if (!title || !description || !status) {
+      this.showError('Заполните все поля задачи');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'boards', this.boardId), {
+        [`tasks.${taskId}`]: {
+          title,
+          description,
+          status,
+          createdBy: this.boardData.tasks[taskId].createdBy,
+          assignedTo: this.user.uid,
+          createdAt: this.boardData.tasks[taskId].createdAt
+        }
+      });
+      document.getElementById('modal').classList.add('hidden');
+      this.showNotification('Задача обновлена!');
+    } catch (err) {
+      this.showError('Ошибка обновления задачи: ' + err.message);
     }
   }
 
