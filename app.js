@@ -12,7 +12,7 @@ const firebaseConfig = {
   appId: "1:484715250794:web:51dac4a0311942176e3613",
   measurementId: "G-GHCKM1FMLP"
 };
-const firebaseApp = initializeApp(firebaseConfig);
+const firebaseApp = initializeApp Controllers(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
@@ -51,15 +51,15 @@ class TaskFlowApp {
     this.app.innerHTML = `
       <div class="container">
         <div class="auth-box">
-          <h2 class="text-2xl font-bold mb-4 text-center">TaskFlow</h2>
+          <h2 class="text-3xl font-bold mb-6 text-center text-gray-800">TaskFlow</h2>
           <div id="error" class="alert hidden"></div>
           <input id="email" type="email" placeholder="Email" class="w-full">
           <input id="password" type="password" placeholder="Пароль" class="w-full">
-          <div class="flex justify-between mb-4">
-            <button id="signUp" class="bg-blue-500">Регистрация</button>
-            <button id="signIn" class="bg-green-500">Вход</button>
+          <div class="flex justify-between mb-4 gap-2">
+            <button id="signUp" class="bg-blue-500 hover:bg-blue-600">Регистрация</button>
+            <button id="signIn" class="bg-green-500 hover:bg-green-600">Вход</button>
           </div>
-          <button id="googleSignIn" class="bg-gray-200">Войти через Google</button>
+          <button id="googleSignIn" class="bg-gray-100 text-gray-800 border hover:bg-gray-200">Войти через Google</button>
         </div>
       </div>
     `;
@@ -70,8 +70,8 @@ class TaskFlowApp {
   }
 
   async handleSignUp() {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
+    const email = document.getElementById('email')?.value;
+    const password = document.getElementById('password')?.value;
     if (!email || !password) {
       this.showError('Введите email и пароль');
       return;
@@ -84,8 +84,8 @@ class TaskFlowApp {
   }
 
   async handleSignIn() {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
+    const email = document.getElementById('email')?.value;
+    const password = document.getElementById('password')?.value;
     if (!email || !password) {
       this.showError('Введите email и пароль');
       return;
@@ -108,9 +108,13 @@ class TaskFlowApp {
 
   showError(message) {
     const errorDiv = document.getElementById('error');
-    errorDiv.textContent = message;
-    errorDiv.classList.remove('hidden');
-    setTimeout(() => errorDiv.classList.add('hidden'), 3000);
+    if (errorDiv) {
+      errorDiv.textContent = message;
+      errorDiv.classList.remove('hidden');
+      setTimeout(() => errorDiv.classList.add('hidden'), 3000);
+    } else {
+      alert(message);
+    }
   }
 
   // Экран выбора доски
@@ -118,10 +122,10 @@ class TaskFlowApp {
     this.app.innerHTML = `
       <div class="container">
         <div class="home-box">
-          <h2 class="text-2xl font-bold mb-4 text-center">Добро пожаловать, ${this.user.email}</h2>
-          <button id="createBoard" class="bg-blue-500 w-full mb-4">Создать новую доску</button>
+          <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Добро пожаловать, ${this.user.email}</h2>
+          <button id="createBoard" class="bg-blue-500 hover:bg-blue-600 w-full mb-4">Создать новую доску</button>
           <input id="inviteLink" type="text" placeholder="Вставьте ссылку на доску" class="w-full">
-          <button id="joinBoard" class="bg-green-500 w-full">Присоединиться к доске</button>
+          <button id="joinBoard" class="bg-green-500 hover:bg-green-600 w-full">Присоединиться к доске</button>
         </div>
       </div>
     `;
@@ -147,9 +151,9 @@ class TaskFlowApp {
   }
 
   async joinBoard() {
-    const inviteLink = document.getElementById('inviteLink').value;
+    const inviteLink = document.getElementById('inviteLink')?.value;
     if (!inviteLink) {
-      alert('Введите ссылку на доску!');
+      this.showError('Введите ссылку на доску!');
       return;
     }
     const boardId = inviteLink.split('/').pop();
@@ -159,10 +163,10 @@ class TaskFlowApp {
         this.boardId = boardId;
         this.render();
       } else {
-        alert('Недействительная ссылка!');
+        this.showError('Недействительная ссылка!');
       }
     } catch (err) {
-      alert('Ошибка при присоединении: ' + err.message);
+      this.showError('Ошибка при присоединении: ' + err.message);
     }
   }
 
@@ -170,23 +174,23 @@ class TaskFlowApp {
   renderBoard() {
     this.app.innerHTML = `
       <div class="board">
-        <h1 class="text-3xl font-bold mb-4">Доска задач</h1>
-        <p class="mb-4">Ссылка на доску: <a href="${window.location.origin}/board/${this.boardId}" class="text-blue-500">${window.location.origin}/board/${this.boardId}</a></p>
+        <h1 class="text-4xl font-bold mb-6 text-gray-800">Доска задач</h1>
+        <p class="mb-6 text-gray-600">Ссылка на доску: <a href="${window.location.origin}/board/${this.boardId}" class="text-blue-500 hover:underline">${window.location.origin}/board/${this.boardId}</a></p>
         <div id="adminControls" class="mb-8"></div>
-        <div class="mb-8">
-          <h2 class="text-xl font-bold mb-2">Добавить задачу</h2>
+        <div class="mb-8 bg-white p-6 rounded-lg shadow-md">
+          <h2 class="text-xl font-bold mb-4 text-gray-800">Добавить задачу</h2>
           <input id="taskTitle" type="text" placeholder="Название задачи" class="mr-2">
           <input id="taskDesc" type="text" placeholder="Описание задачи" class="mr-2">
-          <button id="addTask" class="bg-green-500">Добавить задачу</button>
+          <button id="addTask" class="bg-green-500 hover:bg-green-600">Добавить задачу</button>
         </div>
-        <button id="exportBoard" class="bg-gray-500 mb-4">Экспортировать доску</button>
+        <button id="exportBoard" class="bg-gray-500 hover:bg-gray-600 mb-6">Экспортировать доску</button>
         <div class="board-grid">
           <div>
-            <h2 class="text-xl font-bold mb-2">Общая доска</h2>
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Общая доска</h2>
             <div id="commonBoard" class="droppable"></div>
           </div>
           <div>
-            <h2 class="text-xl font-bold mb-2">Ваши задачи</h2>
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Ваши задачи</h2>
             <div id="personalBoard" class="droppable"></div>
           </div>
         </div>
@@ -215,11 +219,13 @@ class TaskFlowApp {
   renderAdminControls() {
     if (this.boardData?.admin === this.user.uid) {
       document.getElementById('adminControls').innerHTML = `
-        <h2 class="text-xl font-bold mb-2">Добавить роль</h2>
-        <input id="roleName" type="text" placeholder="Название роли" class="mr-2">
-        <input id="roleColor" type="color" value="#000000" class="mr-2 p-1">
-        <input id="roleDesc" type="text" placeholder="Описание роли" class="mr-2">
-        <button id="addRole" class="bg-blue-500">Добавить роль</button>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+          <h2 class="text-xl font-bold mb-4 text-gray-800">Добавить роль</h2>
+          <input id="roleName" type="text" placeholder="Название роли" class="mr-2">
+          <input id="roleColor" type="color" value="#000000" class="mr-2 p-1">
+          <input id="roleDesc" type="text" placeholder="Описание роли" class="mr-2">
+          <button id="addRole" class="bg-blue-500 hover:bg-blue-600">Добавить роль</button>
+        </div>
       `;
       document.getElementById('addRole').addEventListener('click', () => this.addRole());
     } else {
@@ -228,10 +234,10 @@ class TaskFlowApp {
   }
 
   async addRole() {
-    const roleName = document.getElementById('roleName').value;
-    const roleColor = document.getElementById('roleColor').value;
-    const roleDesc = document.getElementById('roleDesc').value;
-    if (!roleName || !roleDesc) {
+    const roleName = document.getElementById('roleName')?.value;
+    const roleColor = document.getElementById('roleColor')?.value;
+    const roleDesc = document.getElementById('roleDesc')?.value;
+    if (!roleName || !ro leDesc) {
       this.showError('Введите название и описание роли');
       return;
     }
@@ -247,8 +253,8 @@ class TaskFlowApp {
   }
 
   async addTask() {
-    const title = document.getElementById('taskTitle').value;
-    const description = document.getElementById('taskDesc').value;
+    const title = document.getElementById('taskTitle')?.value;
+    const description = document.getElementById('taskDesc')?.value;
     if (!title || !description) {
       this.showError('Введите название и описание задачи');
       return;
@@ -285,8 +291,8 @@ class TaskFlowApp {
         taskEl.dataset.id = id;
         taskEl.style.borderLeft = `4px solid ${this.boardData.roles[task.assignedTo]?.color || '#000000'}`;
         taskEl.innerHTML = `
-          <h3 class="font-bold">${task.title}</h3>
-          <p>${task.description}</p>
+          <h3 class="font-bold text-gray-800">${task.title}</h3>
+          <p class="text-gray-600">${task.description}</p>
           <p class="text-sm text-gray-500">Создано: ${task.createdBy === 'admin' ? 'Админ' : 'Вы'}</p>
         `;
         commonBoard.appendChild(taskEl);

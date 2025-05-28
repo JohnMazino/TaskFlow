@@ -1,7 +1,8 @@
 body {
-  font-family: Arial, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   margin: 0;
   padding: 0;
+  background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
 }
 
 .container {
@@ -10,47 +11,59 @@ body {
   align-items: center;
   min-height: 100vh;
   padding: 20px;
+  animation: fadeIn 0.5s ease-out;
 }
 
 .auth-box, .home-box {
   background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
   width: 100%;
-  max-width: 400px;
+  max-width: 450px;
+  animation: slideUp 0.5s ease-out;
 }
 
 .board {
-  padding: 2rem;
-  max-width: 1200px;
+  padding: 3rem;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
 .task-card {
   background: white;
-  padding: 1rem;
+  padding: 1.5rem;
   margin-bottom: 1rem;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: fadeIn 0.3s ease-out;
 }
 
 .task-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
 .task-card.dragging {
-  opacity: 0.7;
+  opacity: 0.8;
+  transform: scale(1.02);
 }
 
 input, button {
-  padding: 0.5rem;
+  padding: 0.75rem;
   margin: 0.5rem 0;
-  border-radius: 4px;
-  border: 1px solid #ccc;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
   width: 100%;
   box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 button {
@@ -58,19 +71,22 @@ button {
   color: white;
   border: none;
   cursor: pointer;
-  transition: background 0.2s;
+  font-weight: 500;
+  transition: transform 0.2s ease, background 0.2s ease;
 }
 
 button:hover {
   background: #2563eb;
+  transform: scale(1.05);
 }
 
 .alert {
   background: #fee2e2;
   color: #b91c1c;
   padding: 1rem;
-  border-radius: 4px;
+  border-radius: 8px;
   margin-bottom: 1rem;
+  animation: fadeIn 0.3s ease-out;
 }
 
 .board-grid {
@@ -83,4 +99,18 @@ button:hover {
   .board-grid {
     grid-template-columns: 1fr;
   }
+  .board {
+    padding: 1.5rem;
+  }
+}
+
+/* Анимации */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
