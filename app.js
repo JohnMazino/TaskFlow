@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // Firebase конфигурация
@@ -12,7 +12,7 @@ const firebaseConfig = {
   appId: "1:484715250794:web:51dac4a0311942176e3613",
   measurementId: "G-GHCKM1FMLP"
 };
-const firebaseApp = initializeApp Controllers(firebaseConfig);
+const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
@@ -78,6 +78,8 @@ class TaskFlowApp {
     }
     try {
       await createUserWithEmailAndPassword(auth, email, password);
+      thisწ
+      this.showNotification('Успешная регистрация!');
     } catch (err) {
       this.showError(err.message);
     }
@@ -92,6 +94,7 @@ class TaskFlowApp {
     }
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      this.showNotification('Успешный вход!');
     } catch (err) {
       this.showError(err.message);
     }
@@ -101,6 +104,16 @@ class TaskFlowApp {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      this.showNotification('Успешный вход через Google!');
+    } catch (err) {
+      this.showError(err.message);
+    }
+  }
+
+  async handleSignOut() {
+    try {
+      await signOut(auth);
+      this.showNotification('Вы вышли из аккаунта');
     } catch (err) {
       this.showError(err.message);
     }
@@ -113,8 +126,24 @@ class TaskFlowApp {
       errorDiv.classList.remove('hidden');
       setTimeout(() => errorDiv.classList.add('hidden'), 3000);
     } else {
-      alert(message);
+      Toastify({
+        text: message,
+        duration: 3000,
+        gravity: "top",
+        position: "right",
+        backgroundColor: "#b91c1c",
+      }).showToast();
     }
+  }
+
+  showNotification(message) {
+    Toastify({
+      text: message,
+      duration: 3000,
+      gravity: "top",
+      position: "right",
+      backgroundColor: "#22c55e",
+    }).showToast();
   }
 
   // Экран выбора доски
@@ -144,6 +173,7 @@ class TaskFlowApp {
         tasks: {}
       });
       this.boardId = boardRef.id;
+      this.showNotification('Доска создана!');
       this.render();
     } catch (err) {
       this.showError('Ошибка при создании доски: ' + err.message);
@@ -161,6 +191,7 @@ class TaskFlowApp {
       const boardDoc = await getDoc(doc(db, 'boards', boardId));
       if (boardDoc.exists()) {
         this.boardId = boardId;
+        this.showNotification('Вы присоединились к доске!');
         this.render();
       } else {
         this.showError('Недействительная ссылка!');
@@ -174,24 +205,36 @@ class TaskFlowApp {
   renderBoard() {
     this.app.innerHTML = `
       <div class="board">
-        <h1 class="text-4xl font-bold mb-6 text-gray-800">Доска задач</h1>
+        <div class="flex justify-between items-center mb-6">
+          <h1 class="text-4xl font-bold text-gray-800">Доска задач</h1>
+          <button id="signOut" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">Выйти</button>
+        </div>
         <p class="mb-6 text-gray-600">Ссылка на доску: <a href="${window.location.origin}/board/${this.boardId}" class="text-blue-500 hover:underline">${window.location.origin}/board/${this.boardId}</a></p>
         <div id="adminControls" class="mb-8"></div>
         <div class="mb-8 bg-white p-6 rounded-lg shadow-md">
           <h2 class="text-xl font-bold mb-4 text-gray-800">Добавить задачу</h2>
           <input id="taskTitle" type="text" placeholder="Название задачи" class="mr-2">
           <input id="taskDesc" type="text" placeholder="Описание задачи" class="mr-2">
+          <select id="taskStatus" class="mr-2">
+            <option value="To Do">To Do</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Done">Done</option>
+          </select>
           <button id="addTask" class="bg-green-500 hover:bg-green-600">Добавить задачу</button>
         </div>
         <button id="exportBoard" class="bg-gray-500 hover:bg-gray-600 mb-6">Экспортировать доску</button>
         <div class="board-grid">
-          <div>
-            <h2 class="text-xl font-bold mb-4 text-gray-800">Общая доска</h2>
-            <div id="commonBoard" class="droppable"></div>
+          <div class="status-column">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">To Do</h2>
+            <div id="todoBoard" class="droppable"></div>
           </div>
-          <div>
-            <h2 class="text-xl font-bold mb-4 text-gray-800">Ваши задачи</h2>
-            <div id="personalBoard" class="droppable"></div>
+          <div class="status-column">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">In Progress</h2>
+            <div id="inProgressBoard" class="droppable"></div>
+          </div>
+          <div class="status-column">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Done</h2>
+            <div id="doneBoard" class="droppable"></div>
           </div>
         </div>
       </div>
@@ -200,6 +243,7 @@ class TaskFlowApp {
     this.initBoardListener();
     document.getElementById('addTask').addEventListener('click', () => this.addTask());
     document.getElementById('exportBoard').addEventListener('click', () => this.exportBoard());
+    document.getElementById('signOut').addEventListener('click', () => this.handleSignOut());
     this.renderAdminControls();
     this.initDragAndDrop();
   }
@@ -237,7 +281,7 @@ class TaskFlowApp {
     const roleName = document.getElementById('roleName')?.value;
     const roleColor = document.getElementById('roleColor')?.value;
     const roleDesc = document.getElementById('roleDesc')?.value;
-    if (!roleName || !ro leDesc) {
+    if (!roleName || !roleDesc) {
       this.showError('Введите название и описание роли');
       return;
     }
@@ -247,6 +291,7 @@ class TaskFlowApp {
       });
       document.getElementById('roleName').value = '';
       document.getElementById('roleDesc').value = '';
+      this.showNotification('Роль добавлена!');
     } catch (err) {
       this.showError('Ошибка добавления роли: ' + err.message);
     }
@@ -255,8 +300,9 @@ class TaskFlowApp {
   async addTask() {
     const title = document.getElementById('taskTitle')?.value;
     const description = document.getElementById('taskDesc')?.value;
-    if (!title || !description) {
-      this.showError('Введите название и описание задачи');
+    const status = document.getElementById('taskStatus')?.value;
+    if (!title || !description || !status) {
+      this.showError('Заполните все поля задачи');
       return;
     }
     try {
@@ -265,6 +311,7 @@ class TaskFlowApp {
         [`tasks.${taskId}`]: {
           title,
           description,
+          status,
           createdBy: this.boardData.admin === this.user.uid ? 'admin' : 'user',
           assignedTo: this.user.uid,
           createdAt: serverTimestamp()
@@ -272,6 +319,7 @@ class TaskFlowApp {
       });
       document.getElementById('taskTitle').value = '';
       document.getElementById('taskDesc').value = '';
+      this.showNotification('Задача добавлена!');
     } catch (err) {
       this.showError('Ошибка добавления задачи: ' + err.message);
     }
@@ -279,10 +327,12 @@ class TaskFlowApp {
 
   // Рендеринг задач
   renderTasks() {
-    const commonBoard = document.getElementById('commonBoard');
-    const personalBoard = document.getElementById('personalBoard');
-    commonBoard.innerHTML = '';
-    personalBoard.innerHTML = '';
+    const todoBoard = document.getElementById('todoBoard');
+    const inProgressBoard = document.getElementById('inProgressBoard');
+    const doneBoard = document.getElementById('doneBoard');
+    todoBoard.innerHTML = '';
+    inProgressBoard.innerHTML = '';
+    doneBoard.innerHTML = '';
 
     if (this.boardData?.tasks) {
       Object.entries(this.boardData.tasks).forEach(([id, task]) => {
@@ -294,12 +344,14 @@ class TaskFlowApp {
           <h3 class="font-bold text-gray-800">${task.title}</h3>
           <p class="text-gray-600">${task.description}</p>
           <p class="text-sm text-gray-500">Создано: ${task.createdBy === 'admin' ? 'Админ' : 'Вы'}</p>
+          <p class="text-sm text-gray-500">Статус: ${task.status}</p>
         `;
-        commonBoard.appendChild(taskEl);
-
-        if (task.assignedTo === this.user.uid) {
-          const personalTaskEl = taskEl.cloneNode(true);
-          personalBoard.appendChild(personalTaskEl);
+        if (task.status === 'To Do') {
+          todoBoard.appendChild(taskEl);
+        } else if (task.status === 'In Progress') {
+          inProgressBoard.appendChild(taskEl);
+        } else if (task.status === 'Done') {
+          doneBoard.appendChild(taskEl);
         }
       });
     }
@@ -315,8 +367,19 @@ class TaskFlowApp {
         onStart: (evt) => {
           evt.item.classList.add('dragging');
         },
-        onEnd: (evt) => {
+        onEnd: async (evt) => {
           evt.item.classList.remove('dragging');
+          const taskId = evt.item.dataset.id;
+          const newStatus = evt.to.id === 'todoBoard' ? 'To Do' :
+                           evt.to.id === 'inProgressBoard' ? 'In Progress' : 'Done';
+          try {
+            await updateDoc(doc(db, 'boards', this.boardId), {
+              [`tasks.${taskId}.status`]: newStatus
+            });
+            this.showNotification('Статус задачи обновлён!');
+          } catch (err) {
+            this.showError('Ошибка обновления статуса: ' + err.message);
+          }
         }
       });
     });
@@ -336,6 +399,7 @@ class TaskFlowApp {
     a.download = `board_${this.boardId}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    this.showNotification('Доска экспортирована!');
   }
 }
 

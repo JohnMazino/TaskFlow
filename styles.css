@@ -50,7 +50,7 @@ body {
   transform: scale(1.02);
 }
 
-input, button {
+input, select, button {
   padding: 0.75rem;
   margin: 0.5rem 0;
   border-radius: 8px;
@@ -60,7 +60,7 @@ input, button {
   transition: all 0.2s ease;
 }
 
-input:focus {
+input:focus, select:focus {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
@@ -91,11 +91,18 @@ button:hover {
 
 .board-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
 }
 
-@media (max-width: 768px) {
+.status-column {
+  background: #f9fafb;
+  padding: 1rem;
+  border-radius: 8px;
+  min-height: 200px;
+}
+
+@media (max-width: 1024px) {
   .board-grid {
     grid-template-columns: 1fr;
   }
