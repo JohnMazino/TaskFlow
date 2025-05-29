@@ -31,6 +31,7 @@
     #canvas-container { position: relative; overflow: hidden; }
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
     .modal-content { background: #1a202c; padding: 20px; border-radius: 8px; width: 400px; }
+    .cursor-label { font-size: 12px; font-family: Arial; fill: white; }
   </style>
 </head>
 <body class="bg-gray-900 text-white flex h-screen overflow-hidden">
@@ -41,6 +42,7 @@
     </div>
     <div class="bg-gray-800 p-6 rounded-lg w-96">
       <div id="email-auth">
+        <input id="display-name" type="text" placeholder="Ваше имя" class="w-full bg-gray-700 p-2 rounded mb-2">
         <input id="email" type="email" placeholder="Email" class="w-full bg-gray-700 p-2 rounded mb-2">
         <input id="password" type="password" placeholder="Пароль" class="w-full bg-gray-700 p-2 rounded mb-2">
         <button id="login-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2">Войти</button>
@@ -218,7 +220,42 @@
     let boardRoles = {};
     let canvases = {};
     let currentCanvas = 'Общий';
-    let stage, backgroundLayer, transformerLayer, transformer;
+    let stage, backgroundLayer, transformerLayer, transformer, cursorLayer;
+    let cursors = {};
+
+    // Update Grid Function
+    function updateGrid(stage, backgroundLayer) {
+      try {
+        backgroundLayer.destroyChildren();
+        const scale = stage.scaleX();
+        const stagePos = stage.position();
+        const visibleWidth = stage.width() / scale;
+        const visibleHeight = stage.height() / scale;
+        const gridSpacing = 50;
+        const startX = Math.floor((-stagePos.x / scale - visibleWidth) / gridSpacing) * gridSpacing;
+        const startY = Math.floor((-stagePos.y / scale - visibleHeight) / gridSpacing) * gridSpacing;
+        const endX = startX + visibleWidth * 2;
+        const endY = startY + visibleHeight * 2;
+
+        for (let y = startY; y < endY; y += gridSpacing) {
+          backgroundLayer.add(new Konva.Line({
+            points: [startX, y, endX, y],
+            stroke: 'rgba(255, 255, 255, 0.2)',
+            strokeWidth: 1 / scale,
+          }));
+        }
+        for (let x = startX; x < endX; x += gridSpacing) {
+          backgroundLayer.add(new Konva.Line({
+            points: [x, startY, x, endY],
+            stroke: 'rgba(255, 255, 255, 0.2)',
+            strokeWidth: 1 / scale,
+          }));
+        }
+        backgroundLayer.batchDraw();
+      } catch (error) {
+        console.error('Ошибка обновления сетки:', error);
+      }
+    }
 
     // Authentication
     auth.onAuthStateChanged(user => {
@@ -228,7 +265,15 @@
           authPanel.style.display = 'none';
           boardPanel.style.display = 'flex';
           document.getElementById('comment-author').value = user.displayName || user.email;
-          console.log('Пользователь авторизован:', user.uid);
+          console.log('Пользователь авторизован:', user.displayName || user.email);
+          // Check for join link in URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const boardId = window.location.pathname.match(/\/join\/(.+)/)?.[1];
+          if (boardId) {
+            document.getElementById('join-link').value = `${window.location.origin}/join/${boardId}`;
+            boardPanel.style.display = 'flex';
+            history.replaceState(null, '', '/'); // Clear URL
+          }
         } else {
           currentUser = null;
           authPanel.style.display = 'flex';
@@ -248,7 +293,7 @@
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
         await auth.signInWithEmailAndPassword(email, password);
-        console.log('Вход выполнен');
+        console.log('Вход выполнен:', email);
       } catch (error) {
         console.error('Ошибка входа:', error);
         alert(error.message);
@@ -258,10 +303,12 @@
     // Register
     document.getElementById('register-btn').addEventListener('click', async () => {
       try {
+        const displayName = document.getElementById('display-name').value.trim();
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
-        await auth.createUserWithEmailAndPassword(email, password);
-        console.log('Регистрация выполнена');
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        await userCredential.user.updateProfile({ displayName });
+        console.log('Регистрация выполнена:', displayName || email);
       } catch (error) {
         console.error('Ошибка регистрации:', error);
         alert(error.message);
@@ -272,8 +319,8 @@
     document.getElementById('google-login-btn').addEventListener('click', async () => {
       try {
         const provider = new firebase.auth.GoogleAuthProvider();
-        await auth.signInWithPopup(provider);
-        console.log('Вход через Google выполнен');
+        const result = await auth.signInWithPopup(provider);
+        console.log('Вход через Google выполнен:', result.user.displayName || result.user.email);
       } catch (error) {
         console.error('Ошибка входа через Google:', error);
         alert(error.message);
@@ -301,7 +348,7 @@
           admin: currentUser.uid,
           inviteLink: '',
           roles: { 'Общий': { readOnly: false }, 'Участник': { readOnly: false } },
-          members: { [currentUser.uid]: { role: 'Администратор' } }
+          members: { [currentUser.uid]: { role: 'Администратор', displayName: currentUser.displayName || currentUser.email } }
         });
 
         const boardId = boardRef.id;
@@ -342,7 +389,7 @@
 
         const boardData = boardDoc.data();
         await db.collection('boards').doc(boardId).update({
-          [`members.${currentUser.uid}`]: { role: 'Участник' }
+          [`members.${currentUser.uid}`]: { role: 'Участник', displayName: currentUser.displayName || currentUser.email }
         });
 
         currentBoardId = boardId;
@@ -354,7 +401,7 @@
         sidebar.style.display = 'flex';
         canvasContainer.style.display = 'block';
         initBoard();
-        console.log('Присоединился к доске:', boardId);
+        console.log('Присоединился к доске:', boardId, 'Пользователь:', currentUser.displayName || currentUser.email);
       } catch (error) {
         console.error('Ошибка присоединения:', error);
         alert('Ошибка присоединения');
@@ -373,36 +420,12 @@
 
         // Background Layer (Grid)
         backgroundLayer = new Konva.Layer({ listening: false });
-        const gridSpacing = 50;
-        function updateGrid() {
-          backgroundLayer.destroyChildren();
-          const scale = stage.scaleX();
-          const stagePos = stage.position();
-          const visibleWidth = stage.width() / scale;
-          const visibleHeight = stage.height() / scale;
-          const startX = Math.floor((-stagePos.x / scale - visibleWidth) / gridSpacing) * gridSpacing;
-          const startY = Math.floor((-stagePos.y / scale - visibleHeight) / gridSpacing) * gridSpacing;
-          const endX = startX + visibleWidth * 2;
-          const endY = startY + visibleHeight * 2;
-
-          for (let y = startY; y < endY; y += gridSpacing) {
-            backgroundLayer.add(new Konva.Line({
-              points: [startX, y, endX, y],
-              stroke: 'rgba(255, 255, 255, 0.2)',
-              strokeWidth: 1 / scale,
-            }));
-          }
-          for (let x = startX; x < endX; x += gridSpacing) {
-            backgroundLayer.add(new Konva.Line({
-              points: [x, startY, x, endY],
-              stroke: 'rgba(255, 255, 255, 0.2)',
-              strokeWidth: 1 / scale,
-            }));
-          }
-          backgroundLayer.batchDraw();
-        }
         stage.add(backgroundLayer);
-        updateGrid();
+        updateGrid(stage, backgroundLayer);
+
+        // Cursor Layer
+        cursorLayer = new Konva.Layer();
+        stage.add(cursorLayer);
 
         // Transformer Layer
         transformerLayer = new Konva.Layer();
@@ -451,12 +474,99 @@
           });
         });
 
+        // Track Cursors
+        trackCursors();
+
         updateRolesList();
         setupEventListeners();
         console.log('Доска инициализирована');
       } catch (error) {
         console.error('Ошибка инициализации доски:', error);
       }
+    }
+
+    // Track Cursors
+    function trackCursors() {
+      try {
+        // Update current user's cursor position
+        stage.on('mousemove', () => {
+          if (!currentUser || !currentBoardId) return;
+          const pos = stage.getPointerPosition();
+          db.collection(`boards/${currentBoardId}/cursors`).doc(currentUser.uid).set({
+            x: pos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+            y: pos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+            displayName: currentUser.displayName || currentUser.email,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        });
+
+        // Listen for other users' cursors
+        db.collection(`boards/${currentBoardId}/cursors`).onSnapshot(snapshot => {
+          snapshot.docChanges().forEach(change => {
+            const uid = change.doc.id;
+            const data = change.doc.data();
+
+            if (change.type === 'added' || change.type === 'modified') {
+              if (uid === currentUser?.uid) return;
+
+              if (!cursors[uid]) {
+                cursors[uid] = new Konva.Group();
+                const cursor = new Konva.Line({
+                  points: [0, 0, 10, 10, 0, 20],
+                  stroke: getColorForUid(uid),
+                  strokeWidth: 2,
+                  closed: true,
+                  fill: getColorForUid(uid)
+                });
+                const label = new Konva.Text({
+                  x: 12,
+                  y: 0,
+                  text: data.displayName,
+                  fontSize: 12,
+                  fontFamily: 'Arial',
+                  fill: 'white',
+                  padding: 2,
+                  shadowColor: 'black',
+                  shadowBlur: 4
+                });
+                cursors[uid].add(cursor, label);
+                cursorLayer.add(cursors[uid]);
+              }
+
+              cursors[uid].position({
+                x: data.x * stage.scaleX() + stage.x(),
+                y: data.y * stage.scaleY() + stage.y()
+              });
+              cursorLayer.batchDraw();
+            } else if (change.type === 'removed') {
+              if (cursors[uid]) {
+                cursors[uid].destroy();
+                delete cursors[uid];
+                cursorLayer.batchDraw();
+              }
+            }
+          });
+        });
+
+        // Clean up old cursors
+        setInterval(() => {
+          db.collection(`boards/${currentBoardId}/cursors`)
+            .where('lastUpdated', '<', new Date(Date.now() - 10 * 1000))
+            .get()
+            .then(snapshot => {
+              snapshot.forEach(doc => doc.ref.delete());
+            });
+        }, 5000);
+      } catch (error) {
+        console.error('Ошибка отслеживания курсоров:', error);
+      }
+    }
+
+    // Get Color for UID
+    function getColorForUid(uid) {
+      const colors = ['#ff0000', '#00ff00', '#0000ff', '#ff00ff', '#00ffff', '#ffa500'];
+      const index = uid.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % colors.length;
+      return colors[index];
     }
 
     // Create Element from Firestore Data
@@ -627,7 +737,7 @@
             }
             currentCanvas = role;
             stage.getLayers().forEach(layer => {
-              if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
+              if (layer !== backgroundLayer && layer !== transformerLayer && layer !== cursorLayer) layer.remove();
             });
             stage.add(canvases[role]);
             stage.batchDraw();
@@ -700,7 +810,7 @@
         Object.keys(members).forEach(uid => {
           const option = document.createElement('option');
           option.value = uid;
-          option.textContent = uid; // Можно заменить на displayName
+          option.textContent = members[uid].displayName || uid;
           memberSelect.appendChild(option);
         });
 
@@ -717,500 +827,504 @@
 
     // Setup Event Listeners
     function setupEventListeners() {
-      // Admin Panel Toggle
-      document.getElementById('toggle-admin').addEventListener('click', () => {
-        const adminPanel = document.getElementById('admin-panel');
-        adminPanel.style.display = adminPanel.style.display === 'none' ? 'block' : 'none';
-        adminPanel.classList.toggle('slide-in', adminPanel.style.display === 'block');
-      });
+      try {
+        // Admin Panel Toggle
+        document.getElementById('toggle-admin').addEventListener('click', () => {
+          const adminPanel = document.getElementById('admin-panel');
+          adminPanel.style.display = adminPanel.style.display === 'none' ? 'block' : 'none';
+          adminPanel.classList.toggle('slide-in', adminPanel.style.display === 'block');
+        });
 
-      // Generate Invite Link
-      document.getElementById('generate-link').addEventListener('click', async () => {
-        document.getElementById('invite-link').value = `${window.location.origin}/join/${currentBoardId}`;
-        console.log('Ссылка-приглашение обновлена');
-      });
+        // Generate Invite Link
+        document.getElementById('generate-link').addEventListener('click', async () => {
+          document.getElementById('invite-link').value = `${window.location.origin}/join/${currentBoardId}`;
+          console.log('Ссылка-приглашение обновлена');
+        });
 
-      // Add Role
-      document.getElementById('add-role').addEventListener('click', async () => {
-        try {
-          const roleInput = document.getElementById('role-input');
-          const role = roleInput.value.trim();
-          if (role && !boardRoles[role]) {
-            boardRoles[role] = { readOnly: false };
-            await db.collection('boards').doc(currentBoardId).update({
-              roles: boardRoles
-            });
-            updateRolesList();
-            roleInput.value = '';
-            console.log('Добавлена роль:', role);
-          }
-        } catch (error) {
-          console.error('Ошибка добавления роли:', error);
-        }
-      });
-
-      // Assign Role
-      document.getElementById('assign-role').addEventListener('click', async () => {
-        try {
-          const uid = document.getElementById('member-select').value;
-          const role = document.getElementById('role-select').value;
-          await db.collection('boards').doc(currentBoardId).update({
-            [`members.${uid}.role`]: role
-          });
-          console.log(`Роль ${role} назначена пользователю ${uid}`);
-        } catch (error) {
-          console.error('Ошибка назначения роли:', error);
-        }
-      });
-
-      // Theme Switch
-      document.getElementById('theme-select').addEventListener('change', (e) => {
-        document.body.className = e.target.value === 'light' ? 'bg-gray-100 text-black light' : 'bg-gray-900 text-white';
-        console.log('Переключена тема:', e.target.value);
-      });
-
-      // Context Menu
-      let contextTarget = null;
-      let contextPos = { x: 0, y: 0 };
-      stage.on('contextmenu', (e) => {
-        e.evt.preventDefault();
-        contextPos = stage.getPointerPosition();
-        const intersection = stage.getIntersection(contextPos);
-        contextTarget = intersection ? getGroupAncestor(intersection) : null;
-
-        const menuItems = ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text', 'delete-element', 'export-pdf'];
-        menuItems.forEach(id => document.getElementById(id).style.display = 'none');
-
-        if (contextTarget) {
-          if (isEditable(contextTarget.attrs.role)) {
-            document.getElementById('delete-element').style.display = 'block';
-            if (contextTarget.hasName('pdf')) {
-              document.getElementById('export-pdf').style.display = 'block';
+        // Add Role
+        document.getElementById('add-role').addEventListener('click', async () => {
+          try {
+            const roleInput = document.getElementById('role-input');
+            const role = roleInput.value.trim();
+            if (role && !boardRoles[role]) {
+              boardRoles[role] = { readOnly: false };
+              await db.collection('boards').doc(currentBoardId).update({
+                roles: boardRoles
+              });
+              updateRolesList();
+              roleInput.value = '';
+              console.log('Добавлена роль:', role);
             }
+          } catch (error) {
+            console.error('Ошибка добавления роли:', error);
           }
-        } else if (isEditable(currentCanvas)) {
-          ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text'].forEach(id => {
-            document.getElementById(id).style.display = 'block';
-          });
-        }
+        });
 
-        contextMenu.style.left = `${e.evt.clientX}px`;
-        contextMenu.style.top = `${e.evt.clientY}px`;
-        contextMenu.style.display = 'block';
-      });
-
-      document.addEventListener('click', (e) => {
-        if (!contextMenu.contains(e.target)) {
-          contextMenu.style.display = 'none';
-          contextTarget = null;
-        }
-      });
-
-      // Transformer Click
-      stage.on('click', (e) => {
-        const pos = stage.getPointerPosition();
-        const intersection = stage.getIntersection(pos);
-        if (!intersection || intersection.getLayer() === backgroundLayer) {
-          transformer.nodes([]);
-        } else {
-          const group = getGroupAncestor(intersection);
-          if (group && isEditable(group.attrs.role)) {
-            transformer.nodes([group]);
-          } else {
-            transformer.nodes([]);
+        // Assign Role
+        document.getElementById('assign-role').addEventListener('click', async () => {
+          try {
+            const uid = document.getElementById('member-select').value;
+            const role = document.getElementById('role-select').value;
+            await db.collection('boards').doc(currentBoardId).update({
+              [`members.${uid}.role`]: role
+            });
+            console.log(`Роль ${role} назначена пользователю ${uid}`);
+          } catch (error) {
+            console.error('Ошибка назначения роли:', error);
           }
-        }
-        stage.batchDraw();
-      });
+        });
 
-      // Create Task
-      document.getElementById('create-task').addEventListener('click', () => {
-        contextMenu.style.display = 'none';
-        document.getElementById('task-modal').style.display = 'flex';
-        document.getElementById('task-title').value = '';
-        document.getElementById('task-desc').value = '';
-      });
+        // Theme Switch
+        document.getElementById('theme-select').addEventListener('change', (e) => {
+          document.body.className = e.target.value === 'light' ? 'bg-gray-100 text-black light' : 'bg-gray-900 text-white';
+          console.log('Переключена тема:', e.target.value);
+        });
 
-      // Cancel Task
-      document.getElementById('cancel-task').addEventListener('click', () => {
-        document.getElementById('task-modal').style.display = 'none';
-        document.getElementById('task-title').value = '';
-        document.getElementById('task-desc').value = '';
-      });
+        // Context Menu
+        let contextTarget = null;
+        let contextPos = { x: 0, y: 0 };
+        stage.on('contextmenu', (e) => {
+          e.evt.preventDefault();
+          contextPos = stage.getPointerPosition();
+          const intersection = stage.getIntersection(contextPos);
+          contextTarget = intersection ? getGroupAncestor(intersection) : null;
 
-      // Save Task
-      let editingTask = null;
-      document.getElementById('save-task').addEventListener('click', async () => {
-        try {
-          const title = document.getElementById('task-title').value.trim();
-          const desc = document.getElementById('task-desc').value.trim();
-          const status = document.getElementById('task-status').value;
-          const role = document.getElementById('task-role').value || currentCanvas;
+          const menuItems = ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text', 'delete-element', 'export-pdf'];
+          menuItems.forEach(id => document.getElementById(id).style.display = 'none');
 
-          if (!title || !desc) {
-            alert('Заполните заголовок и описание');
-            return;
+          if (contextTarget) {
+            if (isEditable(contextTarget.attrs.role)) {
+              document.getElementById('delete-element').style.display = 'block';
+              if (contextTarget.hasName('pdf')) {
+                document.getElementById('export-pdf').style.display = 'block';
+              }
+            }
+          } else if (isEditable(currentCanvas)) {
+            ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text'].forEach(id => {
+              document.getElementById(id).style.display = 'block';
+            });
           }
 
-          if (!isEditable(role)) {
-            alert('Нет прав для редактирования этой роли');
-            return;
-          }
+          contextMenu.style.left = `${e.evt.clientX}px`;
+          contextMenu.style.top = `${e.evt.clientY}px`;
+          contextMenu.style.display = 'block';
+        });
 
-          const taskData = {
-            type: 'task',
-            role,
-            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-            width: 200,
-            height: 150,
-            bgFill: '#ffffff',
-            title,
-            desc,
-            status,
-            createdBy: currentUser.uid
-          };
-
-          if (editingTask) {
-            await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(taskData);
-            editingTask = null;
-          } else {
-            await db.collection(`boards/${currentBoardId}/elements`).add(taskData);
-          }
-
-          document.getElementById('task-modal').style.display = 'none';
-          document.getElementById('task-title').value = '';
-          document.getElementById('task-desc').value = '';
-        } catch (error) {
-          console.error('Ошибка сохранения задачи:', error);
-        }
-      });
-
-      // Create PDF
-      document.getElementById('create-pdf').addEventListener('click', () => {
-        contextMenu.style.display = 'none';
-        document.getElementById('pdf-modal').style.display = 'flex';
-        document.getElementById('pdf-content').value = '';
-      });
-
-      // Cancel PDF
-      document.getElementById('cancel-pdf').addEventListener('click', () => {
-        document.getElementById('pdf-modal').style.display = 'none';
-        document.getElementById('pdf-content').value = '';
-      });
-
-      // Save PDF
-      let editingPdf = null;
-      document.getElementById('save-pdf').addEventListener('click', async () => {
-        try {
-          const content = document.getElementById('pdf-content').value.trim();
-          const role = document.getElementById('task-role').value || currentCanvas;
-
-          if (!content) {
-            alert('Введите содержимое PDF');
-            return;
-          }
-
-          if (!isEditable(role)) {
-            alert('Нет прав для редактирования этой роли');
-            return;
-          }
-
-          const pdfData = {
-            type: 'pdf',
-            role,
-            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-            width: 300,
-            height: 400,
-            bgFill: '#f8f8f8',
-            content,
-            createdBy: currentUser.uid
-          };
-
-          if (editingPdf) {
-            await db.collection(`boards/${currentBoardId}/elements`).doc(editingPdf.id()).update(pdfData);
-            editingPdf = null;
-          } else {
-            await db.collection(`boards/${currentBoardId}/elements`).add(pdfData);
-          }
-
-          document.getElementById('pdf-modal').style.display = 'none';
-          document.getElementById('pdf-content').value = '';
-        } catch (error) {
-          console.error('Ошибка сохранения PDF:', error);
-        }
-      });
-
-      // Export PDF
-      document.getElementById('export-pdf').addEventListener('click', () => {
-        try {
-          if (contextTarget && contextTarget.hasName('pdf')) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            doc.setFont('helvetica', 'normal');
-            const text = contextTarget.findOne('Text').text();
-            const splitText = doc.splitTextToSize(text, 180);
-            doc.text('Содержимое PDF:', 10, 10);
-            doc.text(splitText, 10, 20);
-            doc.save('canvas_pdf.pdf');
-            contextMenu.style.display = 'none';
-          }
-        } catch (error) {
-          console.error('Ошибка экспорта PDF:', error);
-        }
-      });
-
-      // Create Note
-      document.getElementById('create-note').addEventListener('click', () => {
-        contextMenu.style.display = 'none';
-        document.getElementById('note-modal').style.display = 'flex';
-        document.getElementById('note-title').value = '';
-        document.getElementById('note-content').value = '';
-      });
-
-      // Cancel Note
-      document.getElementById('cancel-note').addEventListener('click', () => {
-        document.getElementById('note-modal').style.display = 'none';
-        document.getElementById('note-title').value = '';
-        document.getElementById('note-content').value = '';
-      });
-
-      // Save Note
-      let editingNote = null;
-      document.getElementById('save-note').addEventListener('click', async () => {
-        try {
-          const title = document.getElementById('note-title').value.trim();
-          const content = document.getElementById('note-content').value.trim();
-          const role = document.getElementById('task-role').value || currentCanvas;
-
-          if (!title || !content) {
-            alert('Заполните заголовок и содержимое');
-            return;
-          }
-
-          if (!isEditable(role)) {
-            alert('Нет прав для редактирования этой роли');
-            return;
-          }
-
-          const noteData = {
-            type: 'note',
-            role,
-            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-            width: 200,
-            height: 150,
-            bgFill: '#fefcbf',
-            title,
-            content,
-            createdBy: currentUser.uid
-          };
-
-          if (editingNote) {
-            await db.collection(`boards/${currentBoardId}/elements`).doc(editingNote.id()).update(noteData);
-            editingNote = null;
-          } else {
-            await db.collection(`boards/${currentBoardId}/elements`).add(noteData);
-          }
-
-          document.getElementById('note-modal').style.display = 'none';
-          document.getElementById('note-title').value = '';
-          document.getElementById('note-content').value = '';
-        } catch (error) {
-          console.error('Ошибка сохранения заметки:', error);
-        }
-      });
-
-      // Create Comment
-      document.getElementById('create-comment').addEventListener('click', () => {
-        contextMenu.style.display = 'none';
-        document.getElementById('comment-modal').style.display = 'flex';
-        document.getElementById('comment-content').value = '';
-      });
-
-      // Cancel Comment
-      document.getElementById('cancel-comment').addEventListener('click', () => {
-        document.getElementById('comment-modal').style.display = 'none';
-        document.getElementById('comment-content').value = '';
-      });
-
-      // Save Comment
-      let editingComment = null;
-      document.getElementById('save-comment').addEventListener('click', async () => {
-        try {
-          const author = document.getElementById('comment-author').value.trim();
-          const content = document.getElementById('comment-content').value.trim();
-          const role = document.getElementById('task-role').value || currentCanvas;
-          const date = new Date().toLocaleString('ru-RU');
-
-          if (!author || !content) {
-            alert('Заполните автора и содержимое');
-            return;
-          }
-
-          if (!isEditable(role)) {
-            alert('Нет прав для редактирования этой роли');
-            return;
-          }
-
-          const commentData = {
-            type: 'comment',
-            role,
-            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-            width: 200,
-            height: 150,
-            bgFill: '#e5e7eb',
-            author,
-            content,
-            date,
-            createdBy: currentUser.uid
-          };
-
-          if (editingComment) {
-            await db.collection(`boards/${currentBoardId}/elements`).doc(editingComment.id()).update(commentData);
-            editingComment = null;
-          } else {
-            await db.collection(`boards/${currentBoardId}/elements`).add(commentData);
-          }
-
-          document.getElementById('comment-modal').style.display = 'none';
-          document.getElementById('comment-content').value = '';
-        } catch (error) {
-          console.error('Ошибка сохранения комментария:', error);
-        }
-      });
-
-      // Create Text
-      document.getElementById('create-text').addEventListener('click', () => {
-        contextMenu.style.display = 'none';
-        document.getElementById('text-modal').style.display = 'flex';
-        document.getElementById('text-content').value = '';
-      });
-
-      // Cancel Text
-      document.getElementById('cancel-text').addEventListener('click', () => {
-        document.getElementById('text-modal').style.display = 'none';
-        document.getElementById('text-content').value = '';
-      });
-
-      // Save Text
-      let editingText = null;
-      document.getElementById('save-text').addEventListener('click', async () => {
-        try {
-          const content = document.getElementById('text-content').value.trim();
-          const role = document.getElementById('task-role').value || currentCanvas;
-
-          if (!content) {
-            alert('Введите текст');
-            return;
-          }
-
-          if (!isEditable(role)) {
-            alert('Нет прав для редактирования этой роли');
-            return;
-          }
-
-          const textData = {
-            type: 'text',
-            role,
-            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-            width: 200,
-            height: 100,
-            bgFill: 'transparent',
-            content,
-            createdBy: currentUser.uid
-          };
-
-          if (editingText) {
-            await db.collection(`boards/${currentBoardId}/elements`).doc(editingText.id()).update(textData);
-            editingText = null;
-          } else {
-            await db.collection(`boards/${currentBoardId}/elements`).add(textData);
-          }
-
-          document.getElementById('text-modal').style.display = 'none';
-          document.getElementById('text-content').value = '';
-        } catch (error) {
-          console.error('Ошибка сохранения текста:', error);
-        }
-      });
-
-      // Delete Element
-      document.getElementById('delete-element').addEventListener('click', async () => {
-        try {
-          if (contextTarget && isEditable(contextTarget.attrs.role)) {
-            await db.collection(`boards/${currentBoardId}/elements`).doc(contextTarget.id()).delete();
+        document.addEventListener('click', (e) => {
+          if (!contextMenu.contains(e.target)) {
             contextMenu.style.display = 'none';
             contextTarget = null;
           }
-        } catch (error) {
-          console.error('Ошибка удаления элемента:', error);
-        }
-      });
+        });
 
-      // Zoom and Pan
-      let scale = 1;
-      stage.on('wheel', (e) => {
-        e.evt.preventDefault();
-        const oldScale = scale;
-        const pointer = stage.getPointerPosition();
-        const mousePointTo = {
-          x: pointer.x / oldScale - stage.x() / oldScale,
-          y: pointer.y / oldScale - stage.y() / oldScale,
-        };
-
-        const deltaY = e.evt.deltaY;
-        scale = deltaY > 0 ? scale * 0.9 : scale / 0.9;
-        scale = Math.max(0.5, Math.min(scale, 3));
-
-        stage.scale({ x: scale, y: scale });
-        const newPos = {
-          x: -(mousePointTo.x - pointer.x / scale) * scale,
-          y: -(mousePointTo.y - pointer.y / scale) * scale,
-        };
-        stage.position(newPos);
-        updateGrid();
-        stage.batchDraw();
-      });
-
-      let isDragging = false;
-      let startPos = { x: 0, y: 0 };
-      stage.on('mousedown', (e) => {
-        if (e.evt.ctrlKey && e.evt.button === 0) {
-          isDragging = true;
-          startPos = stage.getPointerPosition();
-        }
-      });
-
-      stage.on('mousemove', (e) => {
-        if (isDragging) {
+        // Transformer Click
+        stage.on('click', (e) => {
           const pos = stage.getPointerPosition();
-          const dx = pos.x - startPos.x;
-          const dy = pos.y - startPos.y;
-          stage.position({
-            x: stage.x() + dx,
-            y: stage.y() + dy,
-          });
-          updateGrid();
+          const intersection = stage.getIntersection(pos);
+          if (!intersection || intersection.getLayer() === backgroundLayer) {
+            transformer.nodes([]);
+          } else {
+            const group = getGroupAncestor(intersection);
+            if (group && isEditable(group.attrs.role)) {
+              transformer.nodes([group]);
+            } else {
+              transformer.nodes([]);
+            }
+          }
           stage.batchDraw();
-          startPos = pos;
-        }
-      });
+        });
 
-      stage.on('mouseup', () => {
-        isDragging = false;
-      });
+        // Create Task
+        document.getElementById('create-task').addEventListener('click', () => {
+          contextMenu.style.display = 'none';
+          document.getElementById('task-modal').style.display = 'flex';
+          document.getElementById('task-title').value = '';
+          document.getElementById('task-desc').value = '';
+        });
 
-      // Resize Window
-      window.addEventListener('resize', () => {
-        stage.width(window.innerWidth - 256);
-        stage.height(window.innerHeight);
-        updateGrid();
-        stage.batchDraw();
-      });
+        // Cancel Task
+        document.getElementById('cancel-task').addEventListener('click', () => {
+          document.getElementById('task-modal').style.display = 'none';
+          document.getElementById('task-title').value = '';
+          document.getElementById('task-desc').value = '';
+        });
+
+        // Save Task
+        let editingTask = null;
+        document.getElementById('save-task').addEventListener('click', async () => {
+          try {
+            const title = document.getElementById('task-title').value.trim();
+            const desc = document.getElementById('task-desc').value.trim();
+            const status = document.getElementById('task-status').value;
+            const role = document.getElementById('task-role').value || currentCanvas;
+
+            if (!title || !desc) {
+              alert('Заполните заголовок и описание');
+              return;
+            }
+
+            if (!isEditable(role)) {
+              alert('Нет прав для редактирования этой роли');
+              return;
+            }
+
+            const taskData = {
+              type: 'task',
+              role,
+              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+              width: 200,
+              height: 150,
+              bgFill: '#ffffff',
+              title,
+              desc,
+              status,
+              createdBy: currentUser.uid
+            };
+
+            if (editingTask) {
+              await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(taskData);
+              editingTask = null;
+            } else {
+              await db.collection(`boards/${currentBoardId}/elements`).add(taskData);
+            }
+
+            document.getElementById('task-modal').style.display = 'none';
+            document.getElementById('task-title').value = '';
+            document.getElementById('task-desc').value = '';
+          } catch (error) {
+            console.error('Ошибка сохранения задачи:', error);
+          }
+        });
+
+        // Create PDF
+        document.getElementById('create-pdf').addEventListener('click', () => {
+          contextMenu.style.display = 'none';
+          document.getElementById('pdf-modal').style.display = 'flex';
+          document.getElementById('pdf-content').value = '';
+        });
+
+        // Cancel PDF
+        document.getElementById('cancel-pdf').addEventListener('click', () => {
+          document.getElementById('pdf-modal').style.display = 'none';
+          document.getElementById('pdf-content').value = '';
+        });
+
+        // Save PDF
+        let editingPdf = null;
+        document.getElementById('save-pdf').addEventListener('click', async () => {
+          try {
+            const content = document.getElementById('pdf-content').value.trim();
+            const role = document.getElementById('task-role').value || currentCanvas;
+
+            if (!content) {
+              alert('Введите содержимое PDF');
+              return;
+            }
+
+            if (!isEditable(role)) {
+              alert('Нет прав для редактирования этой роли');
+              return;
+            }
+
+            const pdfData = {
+              type: 'pdf',
+              role,
+              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+              width: 300,
+              height: 400,
+              bgFill: '#f8f8f8',
+              content,
+              createdBy: currentUser.uid
+            };
+
+            if (editingPdf) {
+              await db.collection(`boards/${currentBoardId}/elements`).doc(editingPdf.id()).update(pdfData);
+              editingPdf = null;
+            } else {
+              await db.collection(`boards/${currentBoardId}/elements`).add(pdfData);
+            }
+
+            document.getElementById('pdf-modal').style.display = 'none';
+            document.getElementById('pdf-content').value = '';
+          } catch (error) {
+            console.error('Ошибка сохранения PDF:', error);
+          }
+        });
+
+        // Export PDF
+        document.getElementById('export-pdf').addEventListener('click', () => {
+          try {
+            if (contextTarget && contextTarget.hasName('pdf')) {
+              const { jsPDF } = window.jspdf;
+              const doc = new jsPDF();
+              doc.setFont('helvetica', 'normal');
+              const text = contextTarget.findOne('Text').text();
+              const splitText = doc.splitTextToSize(text, 180);
+              doc.text('Содержимое PDF:', 10, 10);
+              doc.text(splitText, 10, 20);
+              doc.save('canvas_pdf.pdf');
+              contextMenu.style.display = 'none';
+            }
+          } catch (error) {
+            console.error('Ошибка экспорта PDF:', error);
+          }
+        });
+
+        // Create Note
+        document.getElementById('create-note').addEventListener('click', () => {
+          contextMenu.style.display = 'none';
+          document.getElementById('note-modal').style.display = 'flex';
+          document.getElementById('note-title').value = '';
+          document.getElementById('note-content').value = '';
+        });
+
+        // Cancel Note
+        document.getElementById('cancel-note').addEventListener('click', () => {
+          document.getElementById('note-modal').style.display = 'none';
+          document.getElementById('note-title').value = '';
+          document.getElementById('note-content').value = '';
+        });
+
+        // Save Note
+        let editingNote = null;
+        document.getElementById('save-note').addEventListener('click', async () => {
+          try {
+            const title = document.getElementById('note-title').value.trim();
+            const content = document.getElementById('note-content').value.trim();
+            const role = document.getElementById('task-role').value || currentCanvas;
+
+            if (!title || !content) {
+              alert('Заполните заголовок и содержимое');
+              return;
+            }
+
+            if (!isEditable(role)) {
+              alert('Нет прав для редактирования этой роли');
+              return;
+            }
+
+            const noteData = {
+              type: 'note',
+              role,
+              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+              width: 200,
+              height: 150,
+              bgFill: '#fefcbf',
+              title,
+              content,
+              createdBy: currentUser.uid
+            };
+
+            if (editingNote) {
+              await db.collection(`boards/${currentBoardId}/elements`).doc(editingNote.id()).update(noteData);
+              editingNote = null;
+            } else {
+              await db.collection(`boards/${currentBoardId}/elements`).add(noteData);
+            }
+
+            document.getElementById('note-modal').style.display = 'none';
+            document.getElementById('note-title').value = '';
+            document.getElementById('note-content').value = '';
+          } catch (error) {
+            console.error('Ошибка сохранения заметки:', error);
+          }
+        });
+
+        // Create Comment
+        document.getElementById('create-comment').addEventListener('click', () => {
+          contextMenu.style.display = 'none';
+          document.getElementById('comment-modal').style.display = 'flex';
+          document.getElementById('comment-content').value = '';
+        });
+
+        // Cancel Comment
+        document.getElementById('cancel-comment').addEventListener('click', () => {
+          document.getElementById('comment-modal').style.display = 'none';
+          document.getElementById('comment-content').value = '';
+        });
+
+        // Save Comment
+        let editingComment = null;
+        document.getElementById('save-comment').addEventListener('click', async () => {
+          try {
+            const author = document.getElementById('comment-author').value.trim();
+            const content = document.getElementById('comment-content').value.trim();
+            const role = document.getElementById('task-role').value || currentCanvas;
+            const date = new Date().toLocaleString('ru-RU');
+
+            if (!author || !content) {
+              alert('Заполните автора и содержимое');
+              return;
+            }
+
+            if (!isEditable(role)) {
+              alert('Нет прав для редактирования этой роли');
+              return;
+            }
+
+            const commentData = {
+              type: 'comment',
+              role,
+              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+              width: 200,
+              height: 150,
+              bgFill: '#e5e7eb',
+              author,
+              content,
+              date,
+              createdBy: currentUser.uid
+            };
+
+            if (editingComment) {
+              await db.collection(`boards/${currentBoardId}/elements`).doc(editingComment.id()).update(commentData);
+              editingComment = null;
+            } else {
+              await db.collection(`boards/${currentBoardId}/elements`).add(commentData);
+            }
+
+            document.getElementById('comment-modal').style.display = 'none';
+            document.getElementById('comment-content').value = '';
+          } catch (error) {
+            console.error('Ошибка сохранения комментария:', error);
+          }
+        });
+
+        // Create Text
+        document.getElementById('create-text').addEventListener('click', () => {
+          contextMenu.style.display = 'none';
+          document.getElementById('text-modal').style.display = 'flex';
+          document.getElementById('text-content').value = '';
+        });
+
+        // Cancel Text
+        document.getElementById('cancel-text').addEventListener('click', () => {
+          document.getElementById('text-modal').style.display = 'none';
+          document.getElementById('text-content').value = '';
+        });
+
+        // Save Text
+        let editingText = null;
+        document.getElementById('save-text').addEventListener('click', async () => {
+          try {
+            const content = document.getElementById('text-content').value.trim();
+            const role = document.getElementById('task-role').value || currentCanvas;
+
+            if (!content) {
+              alert('Введите текст');
+              return;
+            }
+
+            if (!isEditable(role)) {
+              alert('Нет прав для редактирования этой роли');
+              return;
+            }
+
+            const textData = {
+              type: 'text',
+              role,
+              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+              width: 200,
+              height: 100,
+              bgFill: 'transparent',
+              content,
+              createdBy: currentUser.uid
+            };
+
+            if (editingText) {
+              await db.collection(`boards/${currentBoardId}/elements`).doc(editingText.id()).update(textData);
+              editingText = null;
+            } else {
+              await db.collection(`boards/${currentBoardId}/elements`).add(textData);
+            }
+
+            document.getElementById('text-modal').style.display = 'none';
+            document.getElementById('text-content').value = '';
+          } catch (error) {
+            console.error('Ошибка сохранения текста:', error);
+          }
+        });
+
+        // Delete Element
+        document.getElementById('delete-element').addEventListener('click', async () => {
+          try {
+            if (contextTarget && isEditable(contextTarget.attrs.role)) {
+              await db.collection(`boards/${currentBoardId}/elements`).doc(contextTarget.id()).delete();
+              contextMenu.style.display = 'none';
+              contextTarget = null;
+            }
+          } catch (error) {
+            console.error('Ошибка удаления элемента:', error);
+          }
+        });
+
+        // Zoom and Pan
+        let scale = 1;
+        stage.on('wheel', (e) => {
+          e.evt.preventDefault();
+          const oldScale = scale;
+          const pointer = stage.getPointerPosition();
+          const mousePointTo = {
+            x: pointer.x / oldScale - stage.x() / oldScale,
+            y: pointer.y / oldScale - stage.y() / oldScale,
+          };
+
+          const deltaY = e.evt.deltaY;
+          scale = deltaY > 0 ? scale * 0.9 : scale / 0.9;
+          scale = Math.max(0.5, Math.min(scale, 3));
+
+          stage.scale({ x: scale, y: scale });
+          const newPos = {
+            x: -(mousePointTo.x - pointer.x / scale) * scale,
+            y: -(mousePointTo.y - pointer.y / scale) * scale,
+          };
+          stage.position(newPos);
+          updateGrid(stage, backgroundLayer);
+          stage.batchDraw();
+        });
+
+        let isDragging = false;
+        let startPos = { x: 0, y: 0 };
+        stage.on('mousedown', (e) => {
+          if (e.evt.ctrlKey && e.evt.button === 0) {
+            isDragging = true;
+            startPos = stage.getPointerPosition();
+          }
+        });
+
+        stage.on('mousemove', (e) => {
+          if (isDragging) {
+            const pos = stage.getPointerPosition();
+            const dx = pos.x - startPos.x;
+            const dy = pos.y - startPos.y;
+            stage.position({
+              x: stage.x() + dx,
+              y: stage.y() + dy,
+            });
+            updateGrid(stage, backgroundLayer);
+            stage.batchDraw();
+            startPos = pos;
+          }
+        });
+
+        stage.on('mouseup', () => {
+          isDragging = false;
+        });
+
+        // Resize Window
+        window.addEventListener('resize', () => {
+          stage.width(window.innerWidth - 256);
+          stage.height(window.innerHeight);
+          updateGrid(stage, backgroundLayer);
+          stage.batchDraw();
+        });
+      } catch (error) {
+        console.error('Ошибка установки обработчиков событий:', error);
+      }
     }
 
     // Get Group Ancestor
