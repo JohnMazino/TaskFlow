@@ -8,10 +8,10 @@
   <script src="https://unpkg.com/konva@8.3.5/konva.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"></script>
+  <!-- Firebase SDK 9.x (Compatibility Mode) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <style>
     @keyframes slide-in {
       from { transform: translateX(100%); opacity: 0; }
@@ -19,7 +19,7 @@
     }
     @keyframes fade-in {
       from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; translateY: (0); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .slide-in { animation: slide-in 0.3s ease-out; }
     .fade-in { animation: fade-in 0.3s ease-out; }
@@ -29,13 +29,13 @@
     body.light .bg-gray-700 { background-color: #e5e7eb; }
     #admin-panel, #auth-panel, #board-panel { z-index: 20; }
     #canvas-container { position: relative; overflow: hidden; }
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
     .modal-content { background: #1a202c; padding: 20px; border-radius: 8px; width: 400px; }
   </style>
 </head>
 <body class="bg-gray-900 text-white flex h-screen overflow-hidden">
   <!-- Auth Panel -->
-<div id="auth-panel" class="flex flex-col items-center justify-center w-full bg-gray-100">
+  <div id="auth-panel" class="flex flex-col items-center justify-center w-full bg-gray-100">
     <div class="text-center mb-8">
       <h2 class="text-3xl font-bold">Вход или регистрация</h2>
     </div>
@@ -53,7 +53,7 @@
   </div>
 
   <!-- Board Selection Panel -->
-  <div id="board-panel" class="hidden flex flex-col items-center justify-center w-full bg-gray-100">
+  <div id="board-panel" style="display: none;" class="flex flex-col items-center justify-center w-full bg-gray-100">
     <div class="bg-gray-800 p-6 rounded-lg w-96">
       <h3 class="text-xl font-bold mb-4">Выберите действие</h3>
       <button id="create-board-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2">Создать новую доску</button>
@@ -63,7 +63,7 @@
   </div>
 
   <!-- Sidebar -->
-  <div id="sidebar" class="hidden w-64 bg-gray-800 p-4 flex flex-col slide-in">
+  <div id="sidebar" style="display: none;" class="w-64 bg-gray-800 p-4 flex flex-col slide-in">
     <h2 class="text-xl font-bold mb-4">Роли и холсты</h2>
     <ul id="roles-list" class="space-y-2"></ul>
     <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Админ-панель</button>
@@ -71,7 +71,7 @@
   </div>
 
   <!-- Admin Panel -->
-  <div id="admin-panel" class="hidden w-80 bg-gray-800 p-4 absolute right-0 top-0 h-full">
+  <div id="admin-panel" style="display: none;" class="w-80 bg-gray-800 p-4 absolute right-0 top-0 h-full">
     <h2 class="text-xl font-bold mb-4">Админ-панель</h2>
     <div class="space-y-4">
       <div>
@@ -101,10 +101,10 @@
   </div>
 
   <!-- Canvas -->
-  <div id="canvas-container" class="hidden flex-1 bg-gray-700 relative"></div>
+  <div id="canvas-container" style="display: none;" class="flex-1 bg-gray-700 relative"></div>
 
   <!-- Context Menu -->
-  <div id="context-menu" class="hidden absolute bg-gray-800 text-white rounded shadow-lg p-2 z-10">
+  <div id="context-menu" style="display: none;" class="absolute bg-gray-800 text-white rounded shadow-lg p-2 z-10">
     <button id="create-task" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать задачу</button>
     <button id="create-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать PDF</button>
     <button id="create-note" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать заметку</button>
@@ -225,16 +225,16 @@
       try {
         if (user) {
           currentUser = user;
-          authPanel.classList.add('hidden');
-          boardPanel.classList.remove('hidden');
+          authPanel.style.display = 'none';
+          boardPanel.style.display = 'flex';
           document.getElementById('comment-author').value = user.displayName || user.email;
           console.log('Пользователь авторизован:', user.uid);
         } else {
           currentUser = null;
-          authPanel.classList.remove('hidden');
-          boardPanel.classList.add('hidden');
-          sidebar.classList.add('hidden');
-          canvasContainer.classList.add('hidden');
+          authPanel.style.display = 'flex';
+          boardPanel.style.display = 'none';
+          sidebar.style.display = 'none';
+          canvasContainer.style.display = 'none';
           console.log('Пользователь не авторизован');
         }
       } catch (error) {
@@ -313,9 +313,9 @@
         userRole = 'Администратор';
         boardRoles = { 'Общий': { readOnly: false }, 'Участник': { readOnly: false } };
 
-        boardPanel.classList.add('hidden');
-        sidebar.classList.remove('hidden');
-        canvasContainer.classList.remove('hidden');
+        boardPanel.style.display = 'none';
+        sidebar.style.display = 'flex';
+        canvasContainer.style.display = 'block';
         initBoard();
         console.log('Доска создана:', boardId);
       } catch (error) {
@@ -350,9 +350,9 @@
         userRole = isAdmin ? 'Администратор' : 'Участник';
         boardRoles = boardData.roles;
 
-        boardPanel.classList.add('hidden');
-        sidebar.classList.remove('hidden');
-        canvasContainer.classList.remove('hidden');
+        boardPanel.style.display = 'none';
+        sidebar.style.display = 'flex';
+        canvasContainer.style.display = 'block';
         initBoard();
         console.log('Присоединился к доске:', boardId);
       } catch (error) {
@@ -681,13 +681,13 @@
     }
 
     // Update Admin Panel
-    function updateAdminPanel() {
+    async function updateAdminPanel() {
       try {
         if (!isAdmin) {
-          document.getElementById('toggle-admin').classList.add('hidden');
+          document.getElementById('toggle-admin').style.display = 'none';
           return;
         }
-        document.getElementById('toggle-admin').classList.remove('hidden');
+        document.getElementById('toggle-admin').style.display = 'block';
         document.getElementById('invite-link').value = `${window.location.origin}/join/${currentBoardId}`;
 
         const memberSelect = document.getElementById('member-select');
@@ -695,14 +695,13 @@
         memberSelect.innerHTML = '';
         roleSelect.innerHTML = '';
 
-        db.collection('boards').doc(currentBoardId).get().then(doc => {
-          const members = doc.data().members || {};
-          Object.keys(members).forEach(uid => {
-            const option = document.createElement('option');
-            option.value = uid;
-            option.textContent = uid; // Можно заменить на displayName
-            memberSelect.appendChild(option);
-          });
+        const doc = await db.collection('boards').doc(currentBoardId).get();
+        const members = doc.data().members || {};
+        Object.keys(members).forEach(uid => {
+          const option = document.createElement('option');
+          option.value = uid;
+          option.textContent = uid; // Можно заменить на displayName
+          memberSelect.appendChild(option);
         });
 
         Object.keys(boardRoles).forEach(role => {
@@ -721,8 +720,8 @@
       // Admin Panel Toggle
       document.getElementById('toggle-admin').addEventListener('click', () => {
         const adminPanel = document.getElementById('admin-panel');
-        adminPanel.classList.toggle('hidden');
-        adminPanel.classList.toggle('slide-in', !adminPanel.classList.contains('hidden'));
+        adminPanel.style.display = adminPanel.style.display === 'none' ? 'block' : 'none';
+        adminPanel.classList.toggle('slide-in', adminPanel.style.display === 'block');
       });
 
       // Generate Invite Link
@@ -780,29 +779,29 @@
         contextTarget = intersection ? getGroupAncestor(intersection) : null;
 
         const menuItems = ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text', 'delete-element', 'export-pdf'];
-        menuItems.forEach(id => document.getElementById(id).classList.add('hidden'));
+        menuItems.forEach(id => document.getElementById(id).style.display = 'none');
 
         if (contextTarget) {
           if (isEditable(contextTarget.attrs.role)) {
-            document.getElementById('delete-element').classList.remove('hidden');
+            document.getElementById('delete-element').style.display = 'block';
             if (contextTarget.hasName('pdf')) {
-              document.getElementById('export-pdf').classList.remove('hidden');
+              document.getElementById('export-pdf').style.display = 'block';
             }
           }
         } else if (isEditable(currentCanvas)) {
           ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text'].forEach(id => {
-            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).style.display = 'block';
           });
         }
 
         contextMenu.style.left = `${e.evt.clientX}px`;
         contextMenu.style.top = `${e.evt.clientY}px`;
-        contextMenu.classList.remove('hidden');
+        contextMenu.style.display = 'block';
       });
 
       document.addEventListener('click', (e) => {
         if (!contextMenu.contains(e.target)) {
-          contextMenu.classList.add('hidden');
+          contextMenu.style.display = 'none';
           contextTarget = null;
         }
       });
@@ -826,7 +825,7 @@
 
       // Create Task
       document.getElementById('create-task').addEventListener('click', () => {
-        contextMenu.classList.add('hidden');
+        contextMenu.style.display = 'none';
         document.getElementById('task-modal').style.display = 'flex';
         document.getElementById('task-title').value = '';
         document.getElementById('task-desc').value = '';
@@ -889,7 +888,7 @@
 
       // Create PDF
       document.getElementById('create-pdf').addEventListener('click', () => {
-        contextMenu.classList.add('hidden');
+        contextMenu.style.display = 'none';
         document.getElementById('pdf-modal').style.display = 'flex';
         document.getElementById('pdf-content').value = '';
       });
@@ -955,7 +954,7 @@
             doc.text('Содержимое PDF:', 10, 10);
             doc.text(splitText, 10, 20);
             doc.save('canvas_pdf.pdf');
-            contextMenu.classList.add('hidden');
+            contextMenu.style.display = 'none';
           }
         } catch (error) {
           console.error('Ошибка экспорта PDF:', error);
@@ -964,7 +963,7 @@
 
       // Create Note
       document.getElementById('create-note').addEventListener('click', () => {
-        contextMenu.classList.add('hidden');
+        contextMenu.style.display = 'none';
         document.getElementById('note-modal').style.display = 'flex';
         document.getElementById('note-title').value = '';
         document.getElementById('note-content').value = '';
@@ -1025,7 +1024,7 @@
 
       // Create Comment
       document.getElementById('create-comment').addEventListener('click', () => {
-        contextMenu.classList.add('hidden');
+        contextMenu.style.display = 'none';
         document.getElementById('comment-modal').style.display = 'flex';
         document.getElementById('comment-content').value = '';
       });
@@ -1085,7 +1084,7 @@
 
       // Create Text
       document.getElementById('create-text').addEventListener('click', () => {
-        contextMenu.classList.add('hidden');
+        contextMenu.style.display = 'none';
         document.getElementById('text-modal').style.display = 'flex';
         document.getElementById('text-content').value = '';
       });
@@ -1144,7 +1143,7 @@
         try {
           if (contextTarget && isEditable(contextTarget.attrs.role)) {
             await db.collection(`boards/${currentBoardId}/elements`).doc(contextTarget.id()).delete();
-            contextMenu.classList.add('hidden');
+            contextMenu.style.display = 'none';
             contextTarget = null;
           }
         } catch (error) {
@@ -1295,4 +1294,3 @@
   </script>
 </body>
 </html>
-
