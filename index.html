@@ -3,19 +3,1296 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TaskFlow - Управление задачами</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="icon" href="https://ivanmclover.netlify.app/favicon.ico" type="image/x-icon">
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <title>Task Management Board</title>
+  <link rel="icon" href="data:,">
+  <script src="https://unpkg.com/konva@8.3.5/konva.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"></script>
+  <style>
+    @keyframes slide-in {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; translateY: (0); }
+    }
+    .slide-in { animation: slide-in 0.3s ease-out; }
+    .fade-in { animation: fade-in 0.3s ease-out; }
+    .card-hover:hover { transform: scale(1.02); transition: transform 0.2s ease; }
+    body.light { background-color: #f3f4f6; color: #1f2937; }
+    body.light .bg-gray-800 { background-color: #ffffff; }
+    body.light .bg-gray-700 { background-color: #e5e7eb; }
+    #admin-panel, #auth-panel, #board-panel { z-index: 20; }
+    #canvas-container { position: relative; overflow: hidden; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; }
+    .modal-content { background: #1a202c; padding: 20px; border-radius: 8px; width: 400px; }
+  </style>
 </head>
-<body class="bg-gray-100">
-  <div id="app"></div>
-  <script type="module" src="app.js"></script>
+<body class="bg-gray-900 text-white flex h-screen overflow-hidden">
+  <!-- Auth Panel -->
+<div id="auth-panel" class="flex flex-col items-center justify-center w-full bg-gray-100">
+    <div class="text-center mb-8">
+      <h2 class="text-3xl font-bold">Вход или регистрация</h2>
+    </div>
+    <div class="bg-gray-800 p-6 rounded-lg w-96">
+      <div id="email-auth">
+        <input id="email" type="email" placeholder="Email" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <input id="password" type="password" placeholder="Пароль" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <button id="login-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2">Войти</button>
+        <button id="register-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full">Зарегистрироваться</button>
+      </div>
+      <div class="mt-4 text-center">
+        <button id="google-login-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 w-full">Войти через Google</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Board Selection Panel -->
+  <div id="board-panel" class="hidden flex flex-col items-center justify-center w-full bg-gray-100">
+    <div class="bg-gray-800 p-6 rounded-lg w-96">
+      <h3 class="text-xl font-bold mb-4">Выберите действие</h3>
+      <button id="create-board-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2">Создать новую доску</button>
+      <input id="join-link" type="text" placeholder="Вставьте ссылку-приглашение" class="w-full bg-gray-700 p-2 rounded mb-2">
+      <button id="join-board-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full">Присоединиться к доске</button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div id="sidebar" class="hidden w-64 bg-gray-800 p-4 flex flex-col slide-in">
+    <h2 class="text-xl font-bold mb-4">Роли и холсты</h2>
+    <ul id="roles-list" class="space-y-2"></ul>
+    <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Админ-панель</button>
+    <button id="logout-btn" class="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">Выйти</button>
+  </div>
+
+  <!-- Admin Panel -->
+  <div id="admin-panel" class="hidden w-80 bg-gray-800 p-4 absolute right-0 top-0 h-full">
+    <h2 class="text-xl font-bold mb-4">Админ-панель</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium">Приглашение по ссылке</label>
+        <input id="invite-link" type="text" readonly class="w-full bg-gray-700 p-2 rounded">
+        <button id="generate-link" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Сгенерировать ссылку</button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Добавить роль</label>
+        <input id="role-input" type="text" placeholder="Введите роль" class="w-full bg-gray-700 p-2 rounded">
+        <button id="add-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Добавить</button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Назначить роль</label>
+        <select id="member-select" class="w-full bg-gray-700 p-2 rounded mb-2"></select>
+        <select id="role-select" class="w-full bg-gray-700 p-2 rounded mb-2"></select>
+        <button id="assign-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Назначить</button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Тема интерфейса</label>
+        <select id="theme-select" class="w-full bg-gray-700 p-2 rounded">
+          <option value="dark">Тёмная</option>
+          <option value="light">Светлая</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div id="canvas-container" class="hidden flex-1 bg-gray-700 relative"></div>
+
+  <!-- Context Menu -->
+  <div id="context-menu" class="hidden absolute bg-gray-800 text-white rounded shadow-lg p-2 z-10">
+    <button id="create-task" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать задачу</button>
+    <button id="create-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать PDF</button>
+    <button id="create-note" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать заметку</button>
+    <button id="create-comment" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать комментарий</button>
+    <button id="create-text" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать текст</button>
+    <button id="delete-element" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Удалить</button>
+    <button id="export-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Экспортировать в PDF</button>
+  </div>
+
+  <!-- Task Modal -->
+  <div id="task-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать задачу</h3>
+      <input id="task-title" type="text" placeholder="Заголовок задачи" class="w-full bg-gray-700 p-2 rounded mb-2">
+      <textarea id="task-desc" placeholder="Описание задачи" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <select id="task-status" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="К выполнению">К выполнению</option>
+        <option value="В процессе">В процессе</option>
+        <option value="Завершено">Завершено</option>
+      </select>
+      <select id="task-role" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="">Выберите роль</option>
+      </select>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-task" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
+        <button id="save-task" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF Modal -->
+  <div id="pdf-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать PDF</h3>
+      <textarea id="pdf-content" placeholder="Содержимое PDF" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-pdf" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
+        <button id="save-pdf" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note Modal -->
+  <div id="note-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать заметку</h3>
+      <input id="note-title" type="text" placeholder="Заголовок заметки" class="w-full bg-gray-700 p-2 rounded mb-2">
+      <textarea id="note-content" placeholder="Содержимое заметки" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-note" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
+        <button id="save-note" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comment Modal -->
+  <div id="comment-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать комментарий</h3>
+      <input id="comment-author" type="text" placeholder="Автор" class="w-full bg-gray-700 p-2 rounded mb-2">
+      <textarea id="comment-content" placeholder="Текст комментария" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-comment" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
+        <button id="save-comment" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text Modal -->
+  <div id="text-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать текст</h3>
+      <textarea id="text-content" placeholder="Введите текст" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-text" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
+        <button id="save-text" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDx9dHwNFuPMGSLFDJHgaH1vfE679ZPVD4",
+      authDomain: "miro-7014e.firebaseapp.com",
+      projectId: "miro-7014e",
+      storageBucket: "miro-7014e.firebasestorage.app",
+      messagingSenderId: "484715250794",
+      appId: "1:484715250794:web:51dac4a0311942176e3613",
+      measurementId: "G-GHCKM1FMLP"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // DOM Elements
+    const authPanel = document.getElementById('auth-panel');
+    const boardPanel = document.getElementById('board-panel');
+    const sidebar = document.getElementById('sidebar');
+    const canvasContainer = document.getElementById('canvas-container');
+    const rolesList = document.getElementById('roles-list');
+    const contextMenu = document.getElementById('context-menu');
+
+    // State
+    let currentUser = null;
+    let currentBoardId = null;
+    let isAdmin = false;
+    let userRole = null;
+    let boardRoles = {};
+    let canvases = {};
+    let currentCanvas = 'Общий';
+    let stage, backgroundLayer, transformerLayer, transformer;
+
+    // Authentication
+    auth.onAuthStateChanged(user => {
+      try {
+        if (user) {
+          currentUser = user;
+          authPanel.classList.add('hidden');
+          boardPanel.classList.remove('hidden');
+          document.getElementById('comment-author').value = user.displayName || user.email;
+          console.log('Пользователь авторизован:', user.uid);
+        } else {
+          currentUser = null;
+          authPanel.classList.remove('hidden');
+          boardPanel.classList.add('hidden');
+          sidebar.classList.add('hidden');
+          canvasContainer.classList.add('hidden');
+          console.log('Пользователь не авторизован');
+        }
+      } catch (error) {
+        console.error('Ошибка обработки состояния авторизации:', error);
+      }
+    });
+
+    // Login
+    document.getElementById('login-btn').addEventListener('click', async () => {
+      try {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        await auth.signInWithEmailAndPassword(email, password);
+        console.log('Вход выполнен');
+      } catch (error) {
+        console.error('Ошибка входа:', error);
+        alert(error.message);
+      }
+    });
+
+    // Register
+    document.getElementById('register-btn').addEventListener('click', async () => {
+      try {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        await auth.createUserWithEmailAndPassword(email, password);
+        console.log('Регистрация выполнена');
+      } catch (error) {
+        console.error('Ошибка регистрации:', error);
+        alert(error.message);
+      }
+    });
+
+    // Google Login
+    document.getElementById('google-login-btn').addEventListener('click', async () => {
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await auth.signInWithPopup(provider);
+        console.log('Вход через Google выполнен');
+      } catch (error) {
+        console.error('Ошибка входа через Google:', error);
+        alert(error.message);
+      }
+    });
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try {
+        await auth.signOut();
+        console.log('Выход выполнен');
+      } catch (error) {
+        console.error('Ошибка выхода:', error);
+      }
+    });
+
+    // Create Board
+    document.getElementById('create-board-btn').addEventListener('click', async () => {
+      try {
+        const boardName = prompt('Введите название доски:');
+        if (!boardName) return;
+
+        const boardRef = await db.collection('boards').add({
+          name: boardName,
+          admin: currentUser.uid,
+          inviteLink: '',
+          roles: { 'Общий': { readOnly: false }, 'Участник': { readOnly: false } },
+          members: { [currentUser.uid]: { role: 'Администратор' } }
+        });
+
+        const boardId = boardRef.id;
+        const inviteLink = `${window.location.origin}/join/${boardId}`;
+        await boardRef.update({ inviteLink });
+
+        currentBoardId = boardId;
+        isAdmin = true;
+        userRole = 'Администратор';
+        boardRoles = { 'Общий': { readOnly: false }, 'Участник': { readOnly: false } };
+
+        boardPanel.classList.add('hidden');
+        sidebar.classList.remove('hidden');
+        canvasContainer.classList.remove('hidden');
+        initBoard();
+        console.log('Доска создана:', boardId);
+      } catch (error) {
+        console.error('Ошибка создания доски:', error);
+        alert('Ошибка создания доски');
+      }
+    });
+
+    // Join Board
+    document.getElementById('join-board-btn').addEventListener('click', async () => {
+      try {
+        const link = document.getElementById('join-link').value.trim();
+        const boardId = link.split('/join/')[1];
+        if (!boardId) {
+          alert('Неверная ссылка');
+          return;
+        }
+
+        const boardDoc = await db.collection('boards').doc(boardId).get();
+        if (!boardDoc.exists) {
+          alert('Доска не найдена');
+          return;
+        }
+
+        const boardData = boardDoc.data();
+        await db.collection('boards').doc(boardId).update({
+          [`members.${currentUser.uid}`]: { role: 'Участник' }
+        });
+
+        currentBoardId = boardId;
+        isAdmin = boardData.admin === currentUser.uid;
+        userRole = isAdmin ? 'Администратор' : 'Участник';
+        boardRoles = boardData.roles;
+
+        boardPanel.classList.add('hidden');
+        sidebar.classList.remove('hidden');
+        canvasContainer.classList.remove('hidden');
+        initBoard();
+        console.log('Присоединился к доске:', boardId);
+      } catch (error) {
+        console.error('Ошибка присоединения:', error);
+        alert('Ошибка присоединения');
+      }
+    });
+
+    // Initialize Board
+    function initBoard() {
+      try {
+        // Initialize Konva Stage
+        stage = new Konva.Stage({
+          container: 'canvas-container',
+          width: window.innerWidth - 256,
+          height: window.innerHeight,
+        });
+
+        // Background Layer (Grid)
+        backgroundLayer = new Konva.Layer({ listening: false });
+        const gridSpacing = 50;
+        function updateGrid() {
+          backgroundLayer.destroyChildren();
+          const scale = stage.scaleX();
+          const stagePos = stage.position();
+          const visibleWidth = stage.width() / scale;
+          const visibleHeight = stage.height() / scale;
+          const startX = Math.floor((-stagePos.x / scale - visibleWidth) / gridSpacing) * gridSpacing;
+          const startY = Math.floor((-stagePos.y / scale - visibleHeight) / gridSpacing) * gridSpacing;
+          const endX = startX + visibleWidth * 2;
+          const endY = startY + visibleHeight * 2;
+
+          for (let y = startY; y < endY; y += gridSpacing) {
+            backgroundLayer.add(new Konva.Line({
+              points: [startX, y, endX, y],
+              stroke: 'rgba(255, 255, 255, 0.2)',
+              strokeWidth: 1 / scale,
+            }));
+          }
+          for (let x = startX; x < endX; x += gridSpacing) {
+            backgroundLayer.add(new Konva.Line({
+              points: [x, startY, x, endY],
+              stroke: 'rgba(255, 255, 255, 0.2)',
+              strokeWidth: 1 / scale,
+            }));
+          }
+          backgroundLayer.batchDraw();
+        }
+        stage.add(backgroundLayer);
+        updateGrid();
+
+        // Transformer Layer
+        transformerLayer = new Konva.Layer();
+        transformer = new Konva.Transformer({
+          nodes: [],
+          keepRatio: false,
+          enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+          boundBoxFunc: (oldBox, newBox) => {
+            if (newBox.width < 50 || newBox.height < 50) return oldBox;
+            return newBox;
+          },
+        });
+        transformerLayer.add(transformer);
+        stage.add(transformerLayer);
+
+        // Initialize Canvases
+        canvases = { 'Общий': new Konva.Layer() };
+        Object.keys(boardRoles).forEach(role => {
+          if (role !== 'Общий') canvases[role] = new Konva.Layer();
+        });
+        stage.add(canvases[currentCanvas]);
+
+        // Load Elements from Firestore
+        db.collection(`boards/${currentBoardId}/elements`).onSnapshot(snapshot => {
+          snapshot.docChanges().forEach(change => {
+            const data = change.doc.data();
+            const elementId = change.doc.id;
+            const role = data.role || 'Общий';
+
+            if (change.type === 'added' || change.type === 'modified') {
+              if (!canvases[role]) return;
+              const existing = canvases[role].findOne(`#${elementId}`);
+              if (existing) existing.destroy();
+
+              const group = createElementFromData(data, elementId);
+              group.id(elementId);
+              canvases[role].add(group);
+              stage.batchDraw();
+            } else if (change.type === 'removed') {
+              const group = canvases[role]?.findOne(`#${elementId}`);
+              if (group) {
+                group.destroy();
+                stage.batchDraw();
+              }
+            }
+          });
+        });
+
+        updateRolesList();
+        setupEventListeners();
+        console.log('Доска инициализирована');
+      } catch (error) {
+        console.error('Ошибка инициализации доски:', error);
+      }
+    }
+
+    // Create Element from Firestore Data
+    function createElementFromData(data, elementId) {
+      const group = new Konva.Group({
+        x: data.x,
+        y: data.y,
+        width: data.width,
+        height: data.height,
+        draggable: isEditable(data.role),
+        name: data.type,
+      });
+
+      const bg = new Konva.Rect({
+        width: data.width,
+        height: data.height,
+        fill: data.bgFill || '#ffffff',
+        stroke: '#d1d5db',
+        strokeWidth: 2,
+        cornerRadius: 8,
+        shadowColor: 'rgba(0,0,0,0.2)',
+        shadowBlur: 10,
+        shadowOffset: { x: 2, y: 2 },
+      });
+
+      group.add(bg);
+
+      if (data.type === 'task') {
+        const titleText = new Konva.Text({
+          x: 10,
+          y: 10,
+          text: data.title,
+          fontSize: 16,
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          fill: 'black',
+          width: data.width - 20,
+          padding: 5,
+        });
+
+        const descText = new Konva.Text({
+          x: 10,
+          y: 40,
+          text: data.desc,
+          fontSize: 14,
+          fontFamily: 'Arial',
+          fill: 'black',
+          width: data.width - 20,
+          padding: 5,
+        });
+
+        const statusText = new Konva.Text({
+          x: 10,
+          y: data.height - 30,
+          text: `Статус: ${data.status}`,
+          fontSize: 14,
+          fontFamily: 'Arial',
+          fill: data.status === 'Завершено' ? '#22c55e' : data.status === 'В процессе' ? '#f59e0b' : '#ef4444',
+          width: data.width - 20,
+          padding: 5,
+        });
+
+        group.add(titleText, descText, statusText);
+      } else if (data.type === 'pdf') {
+        const text = new Konva.Text({
+          x: 10,
+          y: 10,
+          text: data.content,
+          fontSize: 14,
+          fontFamily: 'Arial',
+          fill: 'black',
+          width: data.width - 20,
+          padding: 5,
+        });
+        group.add(text);
+      } else if (data.type === 'note') {
+        const titleText = new Konva.Text({
+          x: 10,
+          y: 10,
+          text: data.title,
+          fontSize: 16,
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          fill: 'black',
+          width: data.width - 20,
+          padding: 5,
+        });
+
+        const contentText = new Konva.Text({
+          x: 10,
+          y: 40,
+          text: data.content,
+          fontSize: 14,
+          fontFamily: 'Arial',
+          fill: 'black',
+          width: data.width - 20,
+          padding: 5,
+        });
+
+        group.add(titleText, contentText);
+      } else if (data.type === 'comment') {
+        const authorText = new Konva.Text({
+          x: 10,
+          y: 10,
+          text: `От: ${data.author} (${data.date})`,
+          fontSize: 14,
+          fontFamily: 'Arial',
+          fontStyle: 'italic',
+          fill: '#000000',
+          width: data.width - 20,
+          padding: 5,
+        });
+
+        const contentText = new Konva.Text({
+          x: 10,
+          y: 40,
+          text: data.content,
+          fontSize: 14,
+          fontFamily: 'Arial',
+          fill: '#000000',
+          width: data.width - 20,
+          padding: 5,
+        });
+
+        group.add(authorText, contentText);
+      } else if (data.type === 'text') {
+        const contentText = new Konva.Text({
+          x: 10,
+          y: 10,
+          text: data.content,
+          fontSize: 14,
+          fontFamily: 'Arial',
+          fill: 'white',
+          width: data.width - 20,
+          padding: 5,
+        });
+        group.add(contentText);
+      }
+
+      if (isEditable(data.role)) {
+        group.on('dblclick', () => editElement(group, data.type));
+        group.on('transformend', () => updateElementSize(group, elementId));
+      }
+
+      return group;
+    }
+
+    // Check if Role is Editable
+    function isEditable(role) {
+      if (isAdmin) return true;
+      if (role === 'Общий' || role === userRole) return true;
+      return false;
+    }
+
+    // Update Roles List
+    function updateRolesList() {
+      try {
+        rolesList.innerHTML = '';
+        const allRoles = ['Общий', ...Object.keys(boardRoles)];
+        allRoles.forEach(role => {
+          const li = document.createElement('li');
+          li.className = `p-2 rounded cursor-pointer transition ${role === currentCanvas ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} fade-in`;
+          li.textContent = role + (boardRoles[role]?.readOnly && !isAdmin ? ' (только просмотр)' : '');
+          li.addEventListener('click', () => {
+            if (!canvases[role]) {
+              canvases[role] = new Konva.Layer();
+              loadElementsForRole(role);
+            }
+            currentCanvas = role;
+            stage.getLayers().forEach(layer => {
+              if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
+            });
+            stage.add(canvases[role]);
+            stage.batchDraw();
+            updateRolesList();
+            console.log(`Переключено на холст: ${role}`);
+          });
+          rolesList.appendChild(li);
+        });
+        updateTaskRoleSelect();
+        updateAdminPanel();
+      } catch (error) {
+        console.error('Ошибка обновления списка ролей:', error);
+      }
+    }
+
+    // Load Elements for Role
+    async function loadElementsForRole(role) {
+      try {
+        const snapshot = await db.collection(`boards/${currentBoardId}/elements`)
+          .where('role', '==', role)
+          .get();
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const elementId = doc.id;
+          const group = createElementFromData(data, elementId);
+          group.id(elementId);
+          canvases[role].add(group);
+        });
+        stage.batchDraw();
+      } catch (error) {
+        console.error('Ошибка загрузки элементов:', error);
+      }
+    }
+
+    // Update Task Role Select
+    function updateTaskRoleSelect() {
+      try {
+        const taskRoleSelect = document.getElementById('task-role');
+        taskRoleSelect.innerHTML = '<option value="">Выберите роль</option>';
+        Object.keys(boardRoles).forEach(role => {
+          if (isAdmin || role === 'Общий' || role === userRole) {
+            const option = document.createElement('option');
+            option.value = role;
+            option.textContent = role;
+            taskRoleSelect.appendChild(option);
+          }
+        });
+      } catch (error) {
+        console.error('Ошибка обновления выбора роли:', error);
+      }
+    }
+
+    // Update Admin Panel
+    function updateAdminPanel() {
+      try {
+        if (!isAdmin) {
+          document.getElementById('toggle-admin').classList.add('hidden');
+          return;
+        }
+        document.getElementById('toggle-admin').classList.remove('hidden');
+        document.getElementById('invite-link').value = `${window.location.origin}/join/${currentBoardId}`;
+
+        const memberSelect = document.getElementById('member-select');
+        const roleSelect = document.getElementById('role-select');
+        memberSelect.innerHTML = '';
+        roleSelect.innerHTML = '';
+
+        db.collection('boards').doc(currentBoardId).get().then(doc => {
+          const members = doc.data().members || {};
+          Object.keys(members).forEach(uid => {
+            const option = document.createElement('option');
+            option.value = uid;
+            option.textContent = uid; // Можно заменить на displayName
+            memberSelect.appendChild(option);
+          });
+        });
+
+        Object.keys(boardRoles).forEach(role => {
+          const option = document.createElement('option');
+          option.value = role;
+          option.textContent = role;
+          roleSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Ошибка обновления админ-панели:', error);
+      }
+    }
+
+    // Setup Event Listeners
+    function setupEventListeners() {
+      // Admin Panel Toggle
+      document.getElementById('toggle-admin').addEventListener('click', () => {
+        const adminPanel = document.getElementById('admin-panel');
+        adminPanel.classList.toggle('hidden');
+        adminPanel.classList.toggle('slide-in', !adminPanel.classList.contains('hidden'));
+      });
+
+      // Generate Invite Link
+      document.getElementById('generate-link').addEventListener('click', async () => {
+        document.getElementById('invite-link').value = `${window.location.origin}/join/${currentBoardId}`;
+        console.log('Ссылка-приглашение обновлена');
+      });
+
+      // Add Role
+      document.getElementById('add-role').addEventListener('click', async () => {
+        try {
+          const roleInput = document.getElementById('role-input');
+          const role = roleInput.value.trim();
+          if (role && !boardRoles[role]) {
+            boardRoles[role] = { readOnly: false };
+            await db.collection('boards').doc(currentBoardId).update({
+              roles: boardRoles
+            });
+            updateRolesList();
+            roleInput.value = '';
+            console.log('Добавлена роль:', role);
+          }
+        } catch (error) {
+          console.error('Ошибка добавления роли:', error);
+        }
+      });
+
+      // Assign Role
+      document.getElementById('assign-role').addEventListener('click', async () => {
+        try {
+          const uid = document.getElementById('member-select').value;
+          const role = document.getElementById('role-select').value;
+          await db.collection('boards').doc(currentBoardId).update({
+            [`members.${uid}.role`]: role
+          });
+          console.log(`Роль ${role} назначена пользователю ${uid}`);
+        } catch (error) {
+          console.error('Ошибка назначения роли:', error);
+        }
+      });
+
+      // Theme Switch
+      document.getElementById('theme-select').addEventListener('change', (e) => {
+        document.body.className = e.target.value === 'light' ? 'bg-gray-100 text-black light' : 'bg-gray-900 text-white';
+        console.log('Переключена тема:', e.target.value);
+      });
+
+      // Context Menu
+      let contextTarget = null;
+      let contextPos = { x: 0, y: 0 };
+      stage.on('contextmenu', (e) => {
+        e.evt.preventDefault();
+        contextPos = stage.getPointerPosition();
+        const intersection = stage.getIntersection(contextPos);
+        contextTarget = intersection ? getGroupAncestor(intersection) : null;
+
+        const menuItems = ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text', 'delete-element', 'export-pdf'];
+        menuItems.forEach(id => document.getElementById(id).classList.add('hidden'));
+
+        if (contextTarget) {
+          if (isEditable(contextTarget.attrs.role)) {
+            document.getElementById('delete-element').classList.remove('hidden');
+            if (contextTarget.hasName('pdf')) {
+              document.getElementById('export-pdf').classList.remove('hidden');
+            }
+          }
+        } else if (isEditable(currentCanvas)) {
+          ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text'].forEach(id => {
+            document.getElementById(id).classList.remove('hidden');
+          });
+        }
+
+        contextMenu.style.left = `${e.evt.clientX}px`;
+        contextMenu.style.top = `${e.evt.clientY}px`;
+        contextMenu.classList.remove('hidden');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!contextMenu.contains(e.target)) {
+          contextMenu.classList.add('hidden');
+          contextTarget = null;
+        }
+      });
+
+      // Transformer Click
+      stage.on('click', (e) => {
+        const pos = stage.getPointerPosition();
+        const intersection = stage.getIntersection(pos);
+        if (!intersection || intersection.getLayer() === backgroundLayer) {
+          transformer.nodes([]);
+        } else {
+          const group = getGroupAncestor(intersection);
+          if (group && isEditable(group.attrs.role)) {
+            transformer.nodes([group]);
+          } else {
+            transformer.nodes([]);
+          }
+        }
+        stage.batchDraw();
+      });
+
+      // Create Task
+      document.getElementById('create-task').addEventListener('click', () => {
+        contextMenu.classList.add('hidden');
+        document.getElementById('task-modal').style.display = 'flex';
+        document.getElementById('task-title').value = '';
+        document.getElementById('task-desc').value = '';
+      });
+
+      // Cancel Task
+      document.getElementById('cancel-task').addEventListener('click', () => {
+        document.getElementById('task-modal').style.display = 'none';
+        document.getElementById('task-title').value = '';
+        document.getElementById('task-desc').value = '';
+      });
+
+      // Save Task
+      let editingTask = null;
+      document.getElementById('save-task').addEventListener('click', async () => {
+        try {
+          const title = document.getElementById('task-title').value.trim();
+          const desc = document.getElementById('task-desc').value.trim();
+          const status = document.getElementById('task-status').value;
+          const role = document.getElementById('task-role').value || currentCanvas;
+
+          if (!title || !desc) {
+            alert('Заполните заголовок и описание');
+            return;
+          }
+
+          if (!isEditable(role)) {
+            alert('Нет прав для редактирования этой роли');
+            return;
+          }
+
+          const taskData = {
+            type: 'task',
+            role,
+            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+            width: 200,
+            height: 150,
+            bgFill: '#ffffff',
+            title,
+            desc,
+            status,
+            createdBy: currentUser.uid
+          };
+
+          if (editingTask) {
+            await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(taskData);
+            editingTask = null;
+          } else {
+            await db.collection(`boards/${currentBoardId}/elements`).add(taskData);
+          }
+
+          document.getElementById('task-modal').style.display = 'none';
+          document.getElementById('task-title').value = '';
+          document.getElementById('task-desc').value = '';
+        } catch (error) {
+          console.error('Ошибка сохранения задачи:', error);
+        }
+      });
+
+      // Create PDF
+      document.getElementById('create-pdf').addEventListener('click', () => {
+        contextMenu.classList.add('hidden');
+        document.getElementById('pdf-modal').style.display = 'flex';
+        document.getElementById('pdf-content').value = '';
+      });
+
+      // Cancel PDF
+      document.getElementById('cancel-pdf').addEventListener('click', () => {
+        document.getElementById('pdf-modal').style.display = 'none';
+        document.getElementById('pdf-content').value = '';
+      });
+
+      // Save PDF
+      let editingPdf = null;
+      document.getElementById('save-pdf').addEventListener('click', async () => {
+        try {
+          const content = document.getElementById('pdf-content').value.trim();
+          const role = document.getElementById('task-role').value || currentCanvas;
+
+          if (!content) {
+            alert('Введите содержимое PDF');
+            return;
+          }
+
+          if (!isEditable(role)) {
+            alert('Нет прав для редактирования этой роли');
+            return;
+          }
+
+          const pdfData = {
+            type: 'pdf',
+            role,
+            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+            width: 300,
+            height: 400,
+            bgFill: '#f8f8f8',
+            content,
+            createdBy: currentUser.uid
+          };
+
+          if (editingPdf) {
+            await db.collection(`boards/${currentBoardId}/elements`).doc(editingPdf.id()).update(pdfData);
+            editingPdf = null;
+          } else {
+            await db.collection(`boards/${currentBoardId}/elements`).add(pdfData);
+          }
+
+          document.getElementById('pdf-modal').style.display = 'none';
+          document.getElementById('pdf-content').value = '';
+        } catch (error) {
+          console.error('Ошибка сохранения PDF:', error);
+        }
+      });
+
+      // Export PDF
+      document.getElementById('export-pdf').addEventListener('click', () => {
+        try {
+          if (contextTarget && contextTarget.hasName('pdf')) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFont('helvetica', 'normal');
+            const text = contextTarget.findOne('Text').text();
+            const splitText = doc.splitTextToSize(text, 180);
+            doc.text('Содержимое PDF:', 10, 10);
+            doc.text(splitText, 10, 20);
+            doc.save('canvas_pdf.pdf');
+            contextMenu.classList.add('hidden');
+          }
+        } catch (error) {
+          console.error('Ошибка экспорта PDF:', error);
+        }
+      });
+
+      // Create Note
+      document.getElementById('create-note').addEventListener('click', () => {
+        contextMenu.classList.add('hidden');
+        document.getElementById('note-modal').style.display = 'flex';
+        document.getElementById('note-title').value = '';
+        document.getElementById('note-content').value = '';
+      });
+
+      // Cancel Note
+      document.getElementById('cancel-note').addEventListener('click', () => {
+        document.getElementById('note-modal').style.display = 'none';
+        document.getElementById('note-title').value = '';
+        document.getElementById('note-content').value = '';
+      });
+
+      // Save Note
+      let editingNote = null;
+      document.getElementById('save-note').addEventListener('click', async () => {
+        try {
+          const title = document.getElementById('note-title').value.trim();
+          const content = document.getElementById('note-content').value.trim();
+          const role = document.getElementById('task-role').value || currentCanvas;
+
+          if (!title || !content) {
+            alert('Заполните заголовок и содержимое');
+            return;
+          }
+
+          if (!isEditable(role)) {
+            alert('Нет прав для редактирования этой роли');
+            return;
+          }
+
+          const noteData = {
+            type: 'note',
+            role,
+            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+            width: 200,
+            height: 150,
+            bgFill: '#fefcbf',
+            title,
+            content,
+            createdBy: currentUser.uid
+          };
+
+          if (editingNote) {
+            await db.collection(`boards/${currentBoardId}/elements`).doc(editingNote.id()).update(noteData);
+            editingNote = null;
+          } else {
+            await db.collection(`boards/${currentBoardId}/elements`).add(noteData);
+          }
+
+          document.getElementById('note-modal').style.display = 'none';
+          document.getElementById('note-title').value = '';
+          document.getElementById('note-content').value = '';
+        } catch (error) {
+          console.error('Ошибка сохранения заметки:', error);
+        }
+      });
+
+      // Create Comment
+      document.getElementById('create-comment').addEventListener('click', () => {
+        contextMenu.classList.add('hidden');
+        document.getElementById('comment-modal').style.display = 'flex';
+        document.getElementById('comment-content').value = '';
+      });
+
+      // Cancel Comment
+      document.getElementById('cancel-comment').addEventListener('click', () => {
+        document.getElementById('comment-modal').style.display = 'none';
+        document.getElementById('comment-content').value = '';
+      });
+
+      // Save Comment
+      let editingComment = null;
+      document.getElementById('save-comment').addEventListener('click', async () => {
+        try {
+          const author = document.getElementById('comment-author').value.trim();
+          const content = document.getElementById('comment-content').value.trim();
+          const role = document.getElementById('task-role').value || currentCanvas;
+          const date = new Date().toLocaleString('ru-RU');
+
+          if (!author || !content) {
+            alert('Заполните автора и содержимое');
+            return;
+          }
+
+          if (!isEditable(role)) {
+            alert('Нет прав для редактирования этой роли');
+            return;
+          }
+
+          const commentData = {
+            type: 'comment',
+            role,
+            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+            width: 200,
+            height: 150,
+            bgFill: '#e5e7eb',
+            author,
+            content,
+            date,
+            createdBy: currentUser.uid
+          };
+
+          if (editingComment) {
+            await db.collection(`boards/${currentBoardId}/elements`).doc(editingComment.id()).update(commentData);
+            editingComment = null;
+          } else {
+            await db.collection(`boards/${currentBoardId}/elements`).add(commentData);
+          }
+
+          document.getElementById('comment-modal').style.display = 'none';
+          document.getElementById('comment-content').value = '';
+        } catch (error) {
+          console.error('Ошибка сохранения комментария:', error);
+        }
+      });
+
+      // Create Text
+      document.getElementById('create-text').addEventListener('click', () => {
+        contextMenu.classList.add('hidden');
+        document.getElementById('text-modal').style.display = 'flex';
+        document.getElementById('text-content').value = '';
+      });
+
+      // Cancel Text
+      document.getElementById('cancel-text').addEventListener('click', () => {
+        document.getElementById('text-modal').style.display = 'none';
+        document.getElementById('text-content').value = '';
+      });
+
+      // Save Text
+      let editingText = null;
+      document.getElementById('save-text').addEventListener('click', async () => {
+        try {
+          const content = document.getElementById('text-content').value.trim();
+          const role = document.getElementById('task-role').value || currentCanvas;
+
+          if (!content) {
+            alert('Введите текст');
+            return;
+          }
+
+          if (!isEditable(role)) {
+            alert('Нет прав для редактирования этой роли');
+            return;
+          }
+
+          const textData = {
+            type: 'text',
+            role,
+            x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+            y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+            width: 200,
+            height: 100,
+            bgFill: 'transparent',
+            content,
+            createdBy: currentUser.uid
+          };
+
+          if (editingText) {
+            await db.collection(`boards/${currentBoardId}/elements`).doc(editingText.id()).update(textData);
+            editingText = null;
+          } else {
+            await db.collection(`boards/${currentBoardId}/elements`).add(textData);
+          }
+
+          document.getElementById('text-modal').style.display = 'none';
+          document.getElementById('text-content').value = '';
+        } catch (error) {
+          console.error('Ошибка сохранения текста:', error);
+        }
+      });
+
+      // Delete Element
+      document.getElementById('delete-element').addEventListener('click', async () => {
+        try {
+          if (contextTarget && isEditable(contextTarget.attrs.role)) {
+            await db.collection(`boards/${currentBoardId}/elements`).doc(contextTarget.id()).delete();
+            contextMenu.classList.add('hidden');
+            contextTarget = null;
+          }
+        } catch (error) {
+          console.error('Ошибка удаления элемента:', error);
+        }
+      });
+
+      // Zoom and Pan
+      let scale = 1;
+      stage.on('wheel', (e) => {
+        e.evt.preventDefault();
+        const oldScale = scale;
+        const pointer = stage.getPointerPosition();
+        const mousePointTo = {
+          x: pointer.x / oldScale - stage.x() / oldScale,
+          y: pointer.y / oldScale - stage.y() / oldScale,
+        };
+
+        const deltaY = e.evt.deltaY;
+        scale = deltaY > 0 ? scale * 0.9 : scale / 0.9;
+        scale = Math.max(0.5, Math.min(scale, 3));
+
+        stage.scale({ x: scale, y: scale });
+        const newPos = {
+          x: -(mousePointTo.x - pointer.x / scale) * scale,
+          y: -(mousePointTo.y - pointer.y / scale) * scale,
+        };
+        stage.position(newPos);
+        updateGrid();
+        stage.batchDraw();
+      });
+
+      let isDragging = false;
+      let startPos = { x: 0, y: 0 };
+      stage.on('mousedown', (e) => {
+        if (e.evt.ctrlKey && e.evt.button === 0) {
+          isDragging = true;
+          startPos = stage.getPointerPosition();
+        }
+      });
+
+      stage.on('mousemove', (e) => {
+        if (isDragging) {
+          const pos = stage.getPointerPosition();
+          const dx = pos.x - startPos.x;
+          const dy = pos.y - startPos.y;
+          stage.position({
+            x: stage.x() + dx,
+            y: stage.y() + dy,
+          });
+          updateGrid();
+          stage.batchDraw();
+          startPos = pos;
+        }
+      });
+
+      stage.on('mouseup', () => {
+        isDragging = false;
+      });
+
+      // Resize Window
+      window.addEventListener('resize', () => {
+        stage.width(window.innerWidth - 256);
+        stage.height(window.innerHeight);
+        updateGrid();
+        stage.batchDraw();
+      });
+    }
+
+    // Get Group Ancestor
+    function getGroupAncestor(node) {
+      let currentNode = node;
+      while (currentNode && currentNode.getType() !== 'Stage') {
+        if (currentNode.hasName('task') || currentNode.hasName('pdf') || currentNode.hasName('note') || currentNode.hasName('comment') || currentNode.hasName('text')) {
+          return currentNode;
+        }
+        currentNode = currentNode.getParent();
+      }
+      return null;
+    }
+
+    // Edit Element
+    function editElement(group, type) {
+      if (!isEditable(group.attrs.role)) return;
+
+      if (type === 'task') {
+        editingTask = group;
+        document.getElementById('task-modal').style.display = 'flex';
+        document.getElementById('task-title').value = group.find('Text')[0].text();
+        document.getElementById('task-desc').value = group.find('Text')[1].text();
+        document.getElementById('task-status').value = group.find('Text')[2].text().replace('Статус: ', '');
+      } else if (type === 'pdf') {
+        editingPdf = group;
+        document.getElementById('pdf-modal').style.display = 'flex';
+        document.getElementById('pdf-content').value = group.findOne('Text').text();
+      } else if (type === 'note') {
+        editingNote = group;
+        document.getElementById('note-modal').style.display = 'flex';
+        document.getElementById('note-title').value = group.find('Text')[0].text();
+        document.getElementById('note-content').value = group.find('Text')[1].text();
+      } else if (type === 'comment') {
+        editingComment = group;
+        document.getElementById('comment-modal').style.display = 'flex';
+        document.getElementById('comment-author').value = group.find('Text')[0].text().split(' (')[0].replace('От: ', '');
+        document.getElementById('comment-content').value = group.find('Text')[1].text();
+      } else if (type === 'text') {
+        editingText = group;
+        document.getElementById('text-modal').style.display = 'flex';
+        document.getElementById('text-content').value = group.findOne('Text').text();
+      }
+    }
+
+    // Update Element Size
+    async function updateElementSize(group, elementId) {
+      try {
+        const newWidth = group.width() * group.scaleX();
+        const newHeight = group.height() * group.scaleY();
+        group.width(newWidth);
+        group.height(newHeight);
+        group.scaleX(1);
+        group.scaleY(1);
+
+        const bg = group.findOne('Rect');
+        bg.width(newWidth);
+        bg.height(newHeight);
+
+        const texts = group.find('Text');
+        texts.forEach((text, i) => {
+          text.width(newWidth - 20);
+          if (group.hasName('task') && i === 2) {
+            text.y(newHeight - 30);
+          }
+        });
+
+        await db.collection(`boards/${currentBoardId}/elements`).doc(elementId).update({
+          x: group.x(),
+          y: group.y(),
+          width: newWidth,
+          height: newHeight
+        });
+
+        stage.batchDraw();
+        console.log(`${group.name()} изменён: ширина=${newWidth}, высота=${newHeight}`);
+      } catch (error) {
+        console.error('Ошибка обновления размера:', error);
+      }
+    }
+  </script>
 </body>
 </html>
+
