@@ -189,6 +189,7 @@
   </div>
 
   <script>
+  	let lastGridUpdate = 0;
     // Firebase Config
     const firebaseConfig = {
       apiKey: "AIzaSyAdPjUWf2gkcZxOAkQb-3hkjKtuETOVRhc",
@@ -214,6 +215,7 @@
     const contextMenu = document.getElementById('context-menu');
 
     // State
+  
     let currentUser = null;
     let currentBoardId = null;
     let isAdmin = false;
