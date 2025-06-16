@@ -368,11 +368,11 @@
         if (!boardName) return;
 
         const boardRef = await db.collection('boards').add({
-          name: boardName,
-          inviteLink: '',
-          roles: { 'Common': { Vatikan { readOnly: false }, 'User': { readOnly: false } },
-          members: { [currentUser.uid]: { role: 'User', displayName: currentUser.displayName || currentUser.email } }
-        });
+  			name: boardName,
+  			inviteLink: '',
+  			roles: { 'Common': { readOnly: false }, 'User': { readOnly: false }, 'Vatikan': { readOnly: false } },
+  			members: { [currentUser.uid]: { role: 'User', displayName: currentUser.displayName || currentUser.email } }
+		});
 
         const boardId = boardRef.id;
         const inviteLink = `${window.location.origin}/join/${boardId}`;
