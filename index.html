@@ -140,6 +140,9 @@
   <div id="pdf-modal" class="modal-overlay">
     <div class="modal-content">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать PDF</h3>
+      <select id="pdf-role" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="">Выберите роль</option>
+      </select>
       <textarea id="pdf-content" placeholder="Содержимое PDF" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
       <div class="flex justify-end space-x-2">
         <button id="cancel-pdf" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
@@ -153,6 +156,9 @@
     <div class="modal-content">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать заметку</h3>
       <input id="note-title" type="text" placeholder="Заголовок заметки" class="w-full bg-gray-700 p-2 rounded mb-2">
+      <select id="note-role" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="">Выберите роль</option>
+      </select>
       <textarea id="note-content" placeholder="Содержимое заметки" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
       <div class="flex justify-end space-x-2">
         <button id="cancel-note" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
@@ -166,6 +172,9 @@
     <div class="modal-content">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать комментарий</h3>
       <input id="comment-author" type="text" placeholder="Автор" class="w-full bg-gray-700 p-2 rounded mb-2">
+      <select id="comment-role" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="">Выберите роль</option>
+      </select>
       <textarea id="comment-content" placeholder="Текст комментария" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
       <div class="flex justify-end space-x-2">
         <button id="cancel-comment" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
@@ -178,6 +187,9 @@
   <div id="text-modal" class="modal-overlay">
     <div class="modal-content">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать текст</h3>
+      <select id="text-role" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="">Выберите роль</option>
+      </select>
       <textarea id="text-content" placeholder="Введите текст" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
       <div class="flex justify-end space-x-2">
         <button id="cancel-text" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
@@ -188,7 +200,7 @@
 
   <script>
     // Конфигурация Firebase для нового проекта
-  const firebaseConfig = {
+const firebaseConfig = {
     apiKey: "AIzaSyAdPjUWf2gkcZxOAkQb-3hkjKtuETOVRhc",
     authDomain: "tawn-71d42.firebaseapp.com",
     projectId: "tawn-71d42",
@@ -197,6 +209,7 @@
     appId: "1:1098831654973:web:4bdc2fb530d7acb17afa54",
     measurementId: "G-55XQ2KBXW9"
   };
+
 
     // Инициализация Firebase
     firebase.initializeApp(firebaseConfig);
@@ -338,6 +351,10 @@
     // Создание новой доски
     document.getElementById('create-board-btn').addEventListener('click', async () => {
       try {
+        if (!currentUser) {
+          alert('Пожалуйста, войдите в систему');
+          return;
+        }
         const boardName = prompt('Введите название доски:');
         if (!boardName) return;
 
@@ -345,7 +362,7 @@
           name: boardName,
           admin: currentUser.uid,
           inviteLink: '',
-          roles: { 'Общий': { readOnly: false }, 'Участник': { readOnly: false } },
+          roles: { 'Участник': { readOnly: false } },
           members: { [currentUser.uid]: { role: 'Администратор', displayName: currentUser.displayName || currentUser.email } }
         });
 
@@ -356,7 +373,7 @@
         currentBoardId = boardId;
         isAdmin = true;
         userRole = 'Администратор';
-        boardRoles = { 'Общий': { readOnly: false }, 'Участник': { readOnly: false } };
+        boardRoles = { 'Участник': { readOnly: false } };
 
         boardPanel.style.display = 'none';
         sidebar.style.display = 'flex';
@@ -372,6 +389,10 @@
     // Присоединение к доске по ссылке
     document.getElementById('join-board-btn').addEventListener('click', async () => {
       try {
+        if (!currentUser) {
+          alert('Пожалуйста, войдите в систему');
+          return;
+        }
         const link = document.getElementById('join-link').value.trim();
         const boardId = link.split('/join/')[1];
         if (!boardId) {
@@ -623,6 +644,7 @@
 
     // Проверка, можно ли редактировать элемент с данной ролью
     function isEditable(role) {
+      if (!currentUser) return false;
       if (isAdmin) return true;
       if (role === 'Общий' || role === userRole) return true;
       return false;
@@ -632,7 +654,7 @@
     function updateRolesList() {
       try {
         rolesList.innerHTML = '';
-        const allRoles = ['Общий', ...Object.keys(boardRoles)];
+        const allRoles = [...new Set(['Общий', ...Object.keys(boardRoles)])];
         allRoles.forEach(role => {
           const li = document.createElement('li');
           li.className = `p-2 rounded cursor-pointer transition ${role === currentCanvas ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} fade-in`;
@@ -653,7 +675,7 @@
           });
           rolesList.appendChild(li);
         });
-        updateTaskRoleSelect();
+        updateRoleSelects();
         updateAdminPanel();
       } catch (error) {
         console.error('Ошибка обновления списка ролей:', error);
@@ -679,17 +701,23 @@
       }
     }
 
-    // Обновление выбора роли для задачи
-    function updateTaskRoleSelect() {
+    // Обновление выбора роли для всех элементов
+    function updateRoleSelects() {
       try {
-        const taskRoleSelect = document.getElementById('task-role');
-        taskRoleSelect.innerHTML = '<option value="">Выберите роль</option>';
-        Object.keys(boardRoles).forEach(role => {
-          if (isAdmin || role === 'Общий' || role === userRole) {
-            const option = document.createElement('option');
-            option.value = role;
-            option.textContent = role;
-            taskRoleSelect.appendChild(option);
+        const selectIds = ['task-role', 'pdf-role', 'note-role', 'comment-role', 'text-role'];
+        selectIds.forEach(selectId => {
+          const select = document.getElementById(selectId);
+          if (select) {
+            select.innerHTML = '<option value="">Выберите роль</option>';
+            const availableRoles = [...new Set(['Общий', ...Object.keys(boardRoles)])];
+            availableRoles.forEach(role => {
+              if (isAdmin || role === 'Общий' || role === userRole) {
+                const option = document.createElement('option');
+                option.value = role;
+                option.textContent = role;
+                select.appendChild(option);
+              }
+            });
           }
         });
       } catch (error) {
@@ -847,6 +875,7 @@
           document.getElementById('task-modal').style.display = 'flex';
           document.getElementById('task-title').value = '';
           document.getElementById('task-desc').value = '';
+          document.getElementById('task-role').value = '';
         });
 
         // Отмена создания задачи
@@ -854,16 +883,22 @@
           document.getElementById('task-modal').style.display = 'none';
           document.getElementById('task-title').value = '';
           document.getElementById('task-desc').value = '';
+          document.getElementById('task-role').value = '';
         });
 
         // Сохранение задачи
         let editingTask = null;
         document.getElementById('save-task').addEventListener('click', async () => {
           try {
+            if (!currentUser) {
+              alert('Пожалуйста, войдите в систему');
+              return;
+            }
             const title = document.getElementById('task-title').value.trim();
             const desc = document.getElementById('task-desc').value.trim();
             const status = document.getElementById('task-status').value;
             const role = document.getElementById('task-role').value || currentCanvas;
+            console.log('Сохраняем задачу с ролью:', role, 'для пользователя с ролью:', userRole);
 
             if (!title || !desc) {
               alert('Заполните заголовок и описание');
@@ -899,8 +934,10 @@
             document.getElementById('task-modal').style.display = 'none';
             document.getElementById('task-title').value = '';
             document.getElementById('task-desc').value = '';
+            document.getElementById('task-role').value = '';
           } catch (error) {
             console.error('Ошибка сохранения задачи:', error);
+            alert('Ошибка сохранения задачи: ' + error.message);
           }
         });
 
@@ -909,20 +946,27 @@
           contextMenu.style.display = 'none';
           document.getElementById('pdf-modal').style.display = 'flex';
           document.getElementById('pdf-content').value = '';
+          document.getElementById('pdf-role').value = '';
         });
 
         // Отмена создания PDF
         document.getElementById('cancel-pdf').addEventListener('click', () => {
           document.getElementById('pdf-modal').style.display = 'none';
           document.getElementById('pdf-content').value = '';
+          document.getElementById('pdf-role').value = '';
         });
 
         // Сохранение PDF
         let editingPdf = null;
         document.getElementById('save-pdf').addEventListener('click', async () => {
           try {
+            if (!currentUser) {
+              alert('Пожалуйста, войдите в систему');
+              return;
+            }
             const content = document.getElementById('pdf-content').value.trim();
-            const role = document.getElementById('task-role').value || currentCanvas;
+            const role = document.getElementById('pdf-role').value || currentCanvas;
+            console.log('Сохраняем PDF с ролью:', role, 'для пользователя с ролью:', userRole);
 
             if (!content) {
               alert('Введите содержимое PDF');
@@ -955,8 +999,10 @@
 
             document.getElementById('pdf-modal').style.display = 'none';
             document.getElementById('pdf-content').value = '';
+            document.getElementById('pdf-role').value = '';
           } catch (error) {
             console.error('Ошибка сохранения PDF:', error);
+            alert('Ошибка сохранения PDF: ' + error.message);
           }
         });
 
@@ -985,6 +1031,7 @@
           document.getElementById('note-modal').style.display = 'flex';
           document.getElementById('note-title').value = '';
           document.getElementById('note-content').value = '';
+          document.getElementById('note-role').value = '';
         });
 
         // Отмена создания заметки
@@ -992,15 +1039,21 @@
           document.getElementById('note-modal').style.display = 'none';
           document.getElementById('note-title').value = '';
           document.getElementById('note-content').value = '';
+          document.getElementById('note-role').value = '';
         });
 
         // Сохранение заметки
         let editingNote = null;
         document.getElementById('save-note').addEventListener('click', async () => {
           try {
+            if (!currentUser) {
+              alert('Пожалуйста, войдите в систему');
+              return;
+            }
             const title = document.getElementById('note-title').value.trim();
             const content = document.getElementById('note-content').value.trim();
-            const role = document.getElementById('task-role').value || currentCanvas;
+            const role = document.getElementById('note-role').value || currentCanvas;
+            console.log('Сохраняем заметку с ролью:', role, 'для пользователя с ролью:', userRole);
 
             if (!title || !content) {
               alert('Заполните заголовок и содержимое');
@@ -1035,8 +1088,10 @@
             document.getElementById('note-modal').style.display = 'none';
             document.getElementById('note-title').value = '';
             document.getElementById('note-content').value = '';
+            document.getElementById('note-role').value = '';
           } catch (error) {
             console.error('Ошибка сохранения заметки:', error);
+            alert('Ошибка сохранения заметки: ' + error.message);
           }
         });
 
@@ -1045,22 +1100,29 @@
           contextMenu.style.display = 'none';
           document.getElementById('comment-modal').style.display = 'flex';
           document.getElementById('comment-content').value = '';
+          document.getElementById('comment-role').value = '';
         });
 
         // Отмена создания комментария
         document.getElementById('cancel-comment').addEventListener('click', () => {
           document.getElementById('comment-modal').style.display = 'none';
           document.getElementById('comment-content').value = '';
+          document.getElementById('comment-role').value = '';
         });
 
         // Сохранение комментария
         let editingComment = null;
         document.getElementById('save-comment').addEventListener('click', async () => {
           try {
+            if (!currentUser) {
+              alert('Пожалуйста, войдите в систему');
+              return;
+            }
             const author = document.getElementById('comment-author').value.trim();
             const content = document.getElementById('comment-content').value.trim();
-            const role = document.getElementById('task-role').value || currentCanvas;
+            const role = document.getElementById('comment-role').value || currentCanvas;
             const date = new Date().toLocaleString('ru-RU');
+            console.log('Сохраняем комментарий с ролью:', role, 'для пользователя с ролью:', userRole);
 
             if (!author || !content) {
               alert('Заполните автора и содержимое');
@@ -1095,8 +1157,10 @@
 
             document.getElementById('comment-modal').style.display = 'none';
             document.getElementById('comment-content').value = '';
+            document.getElementById('comment-role').value = '';
           } catch (error) {
             console.error('Ошибка сохранения комментария:', error);
+            alert('Ошибка сохранения комментария: ' + error.message);
           }
         });
 
@@ -1105,20 +1169,27 @@
           contextMenu.style.display = 'none';
           document.getElementById('text-modal').style.display = 'flex';
           document.getElementById('text-content').value = '';
+          document.getElementById('text-role').value = '';
         });
 
         // Отмена создания текста
         document.getElementById('cancel-text').addEventListener('click', () => {
           document.getElementById('text-modal').style.display = 'none';
           document.getElementById('text-content').value = '';
+          document.getElementById('text-role').value = '';
         });
 
         // Сохранение текста
         let editingText = null;
         document.getElementById('save-text').addEventListener('click', async () => {
           try {
+            if (!currentUser) {
+              alert('Пожалуйста, войдите в систему');
+              return;
+            }
             const content = document.getElementById('text-content').value.trim();
-            const role = document.getElementById('task-role').value || currentCanvas;
+            const role = document.getElementById('text-role').value || currentCanvas;
+            console.log('Сохраняем текст с ролью:', role, 'для пользователя с ролью:', userRole);
 
             if (!content) {
               alert('Введите текст');
@@ -1151,8 +1222,10 @@
 
             document.getElementById('text-modal').style.display = 'none';
             document.getElementById('text-content').value = '';
+            document.getElementById('text-role').value = '';
           } catch (error) {
             console.error('Ошибка сохранения текста:', error);
+            alert('Ошибка сохранения текста: ' + error.message);
           }
         });
 
@@ -1256,24 +1329,29 @@
         document.getElementById('task-title').value = group.find('Text')[0].text();
         document.getElementById('task-desc').value = group.find('Text')[1].text();
         document.getElementById('task-status').value = group.find('Text')[2].text().replace('Статус: ', '');
+        document.getElementById('task-role').value = group.attrs.role;
       } else if (type === 'pdf') {
         editingPdf = group;
         document.getElementById('pdf-modal').style.display = 'flex';
         document.getElementById('pdf-content').value = group.findOne('Text').text();
+        document.getElementById('pdf-role').value = group.attrs.role;
       } else if (type === 'note') {
         editingNote = group;
         document.getElementById('note-modal').style.display = 'flex';
         document.getElementById('note-title').value = group.find('Text')[0].text();
         document.getElementById('note-content').value = group.find('Text')[1].text();
+        document.getElementById('note-role').value = group.attrs.role;
       } else if (type === 'comment') {
         editingComment = group;
         document.getElementById('comment-modal').style.display = 'flex';
         document.getElementById('comment-author').value = group.find('Text')[0].text().split(' (')[0].replace('От: ', '');
         document.getElementById('comment-content').value = group.find('Text')[1].text();
+        document.getElementById('comment-role').value = group.attrs.role;
       } else if (type === 'text') {
         editingText = group;
         document.getElementById('text-modal').style.display = 'flex';
         document.getElementById('text-content').value = group.findOne('Text').text();
+        document.getElementById('text-role').value = group.attrs.role;
       }
     }
 
