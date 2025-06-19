@@ -24,7 +24,7 @@
     .fade-in { animation: fade-in 0.3s ease-out; }
     .card-hover:hover { transform: scale(1.02); transition: transform 0.2s ease; }
     #admin-panel, #auth-panel, #board-panel { z-index: 1000; }
-    #canvas-container { position: relative; overflow: hidden; width: 100%; height: 100%; }
+    #canvas-container { position: relative; overflow: hidden; width: 100%; height: calc(100vh - 48px); }
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
     .modal-content { background: #1a202c; padding: 4px; border-radius: 8px; width: 90%; max-width: 400px; }
     @media (max-width: 600px) {
@@ -74,7 +74,7 @@
   </div>
 
   <!-- Админ-панель -->
-  <div id="admin-panel" style="display: none;" class="w-full bg-gray-800 p-4 absolute right-0 top-0 h-full sm:w-80 sm:h-full">
+  <div id="admin-panel" style="display: none;" class="w-full bg-gray-800 p-4 absolute right-0 top-0 h-full sm:w-80 sm:h-full slide-in">
     <h2 class="text-lg font-semibold mb-4 sm:text-xl">Админ-панель</h2>
     <div class="space-y-4">
       <div>
@@ -201,6 +201,8 @@
     const canvasContainer = document.getElementById('canvas-container');
     const rolesList = document.getElementById('roles-list');
     const contextMenu = document.getElementById('context-menu');
+    const adminPanel = document.getElementById('admin-panel');
+    const toggleAdminBtn = document.getElementById('toggle-admin');
 
     // Состояние приложения
     let currentUser = null;
@@ -260,6 +262,7 @@
           }));
         }
         backgroundLayer.batchDraw();
+        console.log('Сетка обновлена');
       } catch (error) {
         console.error('Ошибка обновления сетки:', error);
       }
@@ -354,7 +357,8 @@
           name: boardName,
           inviteLink: '',
           roles: { 'Common': { readOnly: false } }, // Только Common холст
-          members: { [currentUser.uid]: { role: 'Common', displayName: currentUser.displayName || currentUser.email } }
+          members: { [currentUser.uid]: { role: 'Common', displayName: currentUser.displayName || currentUser.email } },
+          creator: currentUser.uid // Добавляем создателя
         });
 
         console.log('Доска успешно создана, ID:', boardRef.id);
@@ -363,13 +367,13 @@
         await boardRef.update({ inviteLink });
 
         currentBoardId = boardId;
-        isAdmin = false;
+        isAdmin = true; // Создатель доски — администратор
         userRole = 'Common';
         boardRoles = { 'Common': { readOnly: false } };
 
         boardPanel.style.display = 'none';
         sidebar.style.display = 'flex';
-        canvasContainer.style.display = 'flex';
+        canvasContainer.style.display = 'block'; // Явно включаем canvas
         initBoard();
         console.log('Доска инициализирована:', boardId);
       } catch (error) {
@@ -400,13 +404,13 @@
         });
 
         currentBoardId = boardId;
-        isAdmin = false;
+        isAdmin = boardData.creator === currentUser.uid; // Проверяем, создатель ли пользователь
         userRole = 'Common';
         boardRoles = boardData.roles;
 
         boardPanel.style.display = 'none';
         sidebar.style.display = 'flex';
-        canvasContainer.style.display = 'flex';
+        canvasContainer.style.display = 'block';
         initBoard();
         console.log('Присоединились к доске:', boardId, 'Пользователь:', currentUser.displayName || currentUser.email);
       } catch (error) {
@@ -418,10 +422,14 @@
     // Инициализация доски
     function initBoard() {
       try {
+        // Проверяем размеры canvas-container
+        const containerRect = canvasContainer.getBoundingClientRect();
+        console.log('Размеры canvas-container:', containerRect);
+
         stage = new Konva.Stage({
           container: 'canvas-container',
-          width: window.innerWidth - (window.innerWidth < 768 ? 0 : 256),
-          height: window.innerHeight
+          width: containerRect.width || window.innerWidth - (window.innerWidth < 768 ? 0 : 256),
+          height: containerRect.height || window.innerHeight
         });
 
         backgroundLayer = new Konva.Layer({ listening: false });
@@ -443,8 +451,12 @@
 
         canvases = { 'Common': new Konva.Layer() };
         stage.add(canvases[currentCanvas]);
+        stage.batchDraw(); // Явный рендеринг
 
-        loadVisibleElements();
+        console.log('Холст Common добавлен:', canvases[currentCanvas]);
+
+        // Отложенная загрузка элементов
+        setTimeout(loadVisibleElements, 500);
         updateRolesList();
         setupEventListeners();
         console.log('Доска инициализирована');
@@ -465,19 +477,18 @@
         const yMin = -pos.y / scale - height / 2;
         const yMax = yMin + height;
 
-        // Запрос только по x
+        console.log('Загрузка элементов для области:', { xMin, xMax, yMin, yMax });
+
         const snapshot = await db.collection(`boards/${currentBoardId}/elements`)
           .where('x', '>=', xMin)
           .where('x', '<=', xMax)
           .get();
 
-        // Фильтрация по y на клиентской стороне
         snapshot.forEach(doc => {
           const data = doc.data();
           const elementId = doc.id;
           const role = data.role || 'Common';
 
-          // Пропускаем элементы, не попадающие в видимую область по y
           if (data.y < yMin || data.y > yMax) return;
           if (!canvases[role]) return;
 
@@ -487,11 +498,13 @@
           const group = createElementFromData(data, elementId);
           group.id(elementId);
           canvases[role].add(group);
+          console.log('Добавлен элемент:', elementId);
         });
 
         stage.batchDraw();
       } catch (error) {
         console.error('Ошибка загрузки видимых элементов:', error);
+        alert('Ошибка загрузки элементов: ' + error.message);
       }
     }
 
@@ -659,7 +672,6 @@
           });
           stage.add(canvases['Common']);
           stage.batchDraw();
-          updateRolesList();
           console.log('Переключено на холст: Common');
         });
         rolesList.appendChild(li);
@@ -683,8 +695,10 @@
     // Обновление админ-панели
     async function updateAdminPanel() {
       try {
-        document.getElementById('toggle-admin').style.display = 'none';
+        // Показываем кнопку админ-панели только для администратора
+        toggleAdminBtn.style.display = isAdmin ? 'block' : 'none';
         document.getElementById('invite-link').value = `${window.location.origin}/join/${currentBoardId}`;
+        console.log('Админ-панель обновлена, isAdmin:', isAdmin);
       } catch (error) {
         console.error('Ошибка обновления админ-панели:', error);
       }
@@ -694,10 +708,10 @@
     function setupEventListeners() {
       try {
         // Переключение админ-панели
-        document.getElementById('toggle-admin').addEventListener('click', () => {
-          const adminPanel = document.getElementById('admin-panel');
+        toggleAdminBtn.addEventListener('click', () => {
           adminPanel.style.display = adminPanel.style.display === 'none' ? 'block' : 'none';
           adminPanel.classList.toggle('slide-in', adminPanel.style.display === 'block');
+          console.log('Админ-панель переключена:', adminPanel.style.display);
         });
 
         // Генерация ссылки-приглашения
@@ -950,46 +964,46 @@
         // Сохранение заметки
         document.getElementById('save-note').addEventListener('click', async () => {
           try {
-              const title = document.getElementById('note-title').value.trim();
-              const content = document.getElementById('note-content').value.trim();
-              const role = currentCanvas;
+            const title = document.getElementById('note-title').value.trim();
+            const content = document.getElementById('note-content').value.trim();
+            const role = currentCanvas;
 
-              if (!title || !content) {
-                alert('Заполните заголовок и содержимое');
-                return;
-              }
-
-              if (!isEditable(role)) {
-                alert('Нет прав на редактирование');
-                return;
-              }
-
-              const noteData = {
-                type: 'note',
-                role,
-                x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-                y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-                width: 150,
-                height: 120,
-                bgFill: '#ffffff',
-                title,
-                content,
-                createdBy: currentUser.uid
-              };
-
-              if (editingTask) {
-                await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(noteData);
-                editingTask = null;
-              } else {
-                await db.collection(`boards/${currentBoardId}/elements`).add(noteData);
-              }
-
-              document.getElementById('note-modal').style.display = 'none';
-              document.getElementById('note-title').value = '';
-              document.getElementById('note-content').value = '';
-            } catch (error) {
-              console.error('Ошибка сохранения заметки:', error);
+            if (!title || !content) {
+              alert('Заполните заголовок и содержимое');
+              return;
             }
+
+            if (!isEditable(role)) {
+              alert('Нет прав на редактирование');
+              return;
+            }
+
+            const noteData = {
+              type: 'note',
+              role,
+              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+              width: 150,
+              height: 120,
+              bgFill: '#ffffff',
+              title,
+              content,
+              createdBy: currentUser.uid
+            };
+
+            if (editingTask) {
+              await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(noteData);
+              editingTask = null;
+            } else {
+              await db.collection(`boards/${currentBoardId}/elements`).add(noteData);
+            }
+
+            document.getElementById('note-modal').style.display = 'none';
+            document.getElementById('note-title').value = '';
+            document.getElementById('note-content').value = '';
+          } catch (error) {
+            console.error('Ошибка сохранения заметки:', error);
+          }
         });
 
         // Создание комментария
@@ -1242,10 +1256,12 @@
 
         // Изменение размера окна
         window.addEventListener('resize', () => {
-          stage.width(window.innerWidth - (window.innerWidth < 768 ? 0 : 256));
-          stage.height(window.innerHeight);
+          const containerRect = canvasContainer.getBoundingClientRect();
+          stage.width(containerRect.width || window.innerWidth - (window.innerWidth < 768 ? 0 : 256));
+          stage.height(containerRect.height || window.innerHeight);
           updateGrid(stage, backgroundLayer);
           stage.batchDraw();
+          console.log('Окно изменено, новые размеры:', stage.width(), stage.height());
         });
       } catch (error) {
         console.error('Ошибка настройки обработчиков событий:', error);
@@ -1285,7 +1301,7 @@
         document.getElementById('note-content').value = group.find('Text')[1].text();
       } else if (type === 'comment') {
         editingTask = group;
-        document.getElementById('comment-modal').style.display = 'flex';
+        document.getElementById('note-modal').style.display = 'flex';
         document.getElementById('comment-author').value = group.find('Text')[0].text().split(' ')[1];
         document.getElementById('comment-content').value = group.find('Text')[1].text();
       } else if (type === 'text') {
