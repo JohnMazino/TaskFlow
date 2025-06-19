@@ -10,14 +10,19 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     @keyframes slide-in {
-      from { transform: translateX(100%); opacity: 0; }
+      from { transform: translateX(-100%); opacity: 0; }
       to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slide-out {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(-100%); opacity: 0; }
     }
     @keyframes fade-in {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .slide-in { animation: slide-in 0.3s ease-out; }
+    .slide-in { animation: slide-in 0.3s ease-out forwards; }
+    .slide-out { animation: slide-out 0.3s ease-out forwards; }
     .fade-in { animation: fade-in 0.3s ease-out; }
     .card-hover:hover { transform: scale(1.02); transition: transform 0.2s ease; }
     body.light { background-color: #f3f4f6; color: #1f2937; }
@@ -26,33 +31,33 @@
     #admin-panel, #auth-modal, #board-modal { z-index: 30; }
     #canvas-container { position: relative; overflow: hidden; }
     @media (max-width: 768px) {
-      #sidebar { width: 100%; height: 100%; position: fixed; top: 0; left: -100%; transition: left 0.3s ease; }
-      #sidebar.open { left: 0; }
-      #admin-panel { width: 100%; right: -100%; transition: right 0.3s ease; }
-      #admin-panel.open { right: 0; }
+      #sidebar { width: 100%; height: 100%; position: fixed; top: 0; left: -100%; transition: transform 0.3s ease; z-index: 40; }
+      #sidebar.open { transform: translateX(0); }
+      #admin-panel { width: 100%; transform: translateX(100%); transition: transform 0.3s ease; }
+      #admin-panel.open { transform: translateX(0); }
       #canvas-container { width: 100%; }
       .modal-content { width: 90%; max-width: 400px; }
       #hamburger-menu { display: block; }
     }
     @media (min-width: 769px) {
-      #sidebar { width: 256px; position: static; }
-      #admin-panel { width: 320px; }
+      #sidebar { width: 256px; position: static; transform: none; }
+      #admin-panel { width: 320px; transform: none; }
       #hamburger-menu { display: none; }
     }
   </style>
 </head>
 <body class="bg-gray-900 text-white flex h-screen overflow-hidden">
   <!-- Кнопка-гамбургер -->
-  <button id="hamburger-menu" class="fixed top-4 left-4 z-40 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 md:hidden">
+  <button id="hamburger-menu" class="fixed top-4 left-4 z-50 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 md:hidden">
     ☰
   </button>
 
   <!-- Боковая панель -->
-  <div id="sidebar" class="w-64 bg-gray-800 p-4 flex flex-col slide-in">
+  <div id="sidebar" class="w-64 bg-gray-800 p-4 flex flex-col">
     <h2 class="text-xl font-bold mb-4">Доски и роли</h2>
     <div id="boards-list" class="mb-4"></div>
     <ul id="roles-list" class="space-y-2 flex-1"></ul>
-    <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Админ-панель</button>
+    <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition hidden">Админ-панель</button>
     <button id="logout" class="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">Выйти</button>
   </div>
 
@@ -68,6 +73,9 @@
       <div>
         <label class="block text-sm font-medium">Добавить роль</label>
         <input id="role-input" type="text" placeholder="Введите роль" class="w-full bg-gray-700 p-2 rounded">
+        <select id="user-select" class="w-full bg-gray-700 p-2 rounded mt-2">
+          <option value="">Выберите пользователя</option>
+        </select>
         <button id="add-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Добавить</button>
       </div>
       <div>
@@ -210,12 +218,10 @@
   </div>
 
   <script type="module">
-    // Импорт Firebase SDK
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
-    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, query, where, getDocs, arrayUnion } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, query, where, getDocs, arrayUnion, getDocFromCache } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
 
-    // Firebase Config
     const firebaseConfig = {
       apiKey: "AIzaSyAdPjUWf2gkcZxOAkQb-3hkjKtuETOVRhc",
       authDomain: "tawn-71d42.firebaseapp.com",
@@ -226,7 +232,6 @@
       measurementId: "G-55XQ2KBXW9"
     };
 
-    // Инициализация Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -240,7 +245,6 @@
         if (!window.Konva) throw new Error('Konva.js not loaded');
         if (!window.jspdf) throw new Error('jsPDF not loaded');
 
-        // Настройка модального окна аутентификации
         const authModal = document.getElementById('auth-modal');
         const authTitle = document.getElementById('auth-title');
         const authSubmit = document.getElementById('auth-submit');
@@ -248,6 +252,8 @@
         const authError = document.getElementById('auth-error');
         const emailInput = document.getElementById('email-input');
         const passwordInput = document.getElementById('password-input');
+        const sidebar = document.getElementById('sidebar');
+        const hamburgerMenu = document.getElementById('hamburger-menu');
 
         function toggleAuthModeUI() {
           isSignInMode = !isSignInMode;
@@ -261,7 +267,6 @@
 
         toggleAuthMode.addEventListener('click', toggleAuthModeUI);
 
-        // Вход или регистрация по email/пароль
         authSubmit.addEventListener('click', async () => {
           const email = emailInput.value.trim();
           const password = passwordInput.value.trim();
@@ -284,23 +289,12 @@
           } catch (error) {
             let errorMessage = 'Произошла ошибка';
             switch (error.code) {
-              case 'auth/invalid-email':
-                errorMessage = 'Неверный формат email';
-                break;
-              case 'auth/user-not-found':
-                errorMessage = 'Пользователь не найден';
-                break;
-              case 'auth/wrong-password':
-                errorMessage = 'Неверный пароль';
-                break;
-              case 'auth/email-already-in-use':
-                errorMessage = 'Email уже используется';
-                break;
-              case 'auth/weak-password':
-                errorMessage = 'Пароль должен содержать не менее 6 символов';
-                break;
-              default:
-                errorMessage = error.message;
+              case 'auth/invalid-email': errorMessage = 'Неверный формат email'; break;
+              case 'auth/user-not-found': errorMessage = 'Пользователь не найден'; break;
+              case 'auth/wrong-password': errorMessage = 'Неверный пароль'; break;
+              case 'auth/email-already-in-use': errorMessage = 'Email уже используется'; break;
+              case 'auth/weak-password': errorMessage = 'Пароль должен содержать не менее 6 символов'; break;
+              default: errorMessage = error.message;
             }
             authError.textContent = errorMessage;
             authError.classList.remove('hidden');
@@ -308,7 +302,6 @@
           }
         });
 
-        // Проверка аутентификации
         onAuthStateChanged(auth, user => {
           if (user) {
             currentUser = user;
@@ -321,12 +314,11 @@
             authModal.classList.remove('hidden');
             document.getElementById('board-modal').classList.add('hidden');
             document.getElementById('canvas-container').classList.add('hidden');
-            document.getElementById('sidebar').classList.add('hidden');
+            sidebar.classList.add('hidden');
             console.log('No user signed in');
           }
         });
 
-        // Вход через Google
         document.getElementById('google-signin').addEventListener('click', async () => {
           try {
             const provider = new GoogleAuthProvider();
@@ -338,40 +330,50 @@
           }
         });
 
-        // Выход
         document.getElementById('logout').addEventListener('click', async () => {
           try {
             await signOut(auth);
             console.log('User signed out');
             currentBoardId = null;
-            document.getElementById('sidebar').classList.remove('open');
+            sidebar.classList.remove('open');
           } catch (error) {
             console.error('Error signing out:', error);
           }
         });
 
-        // Создание новой доски
+        hamburgerMenu.addEventListener('click', () => {
+          if (sidebar.classList.contains('open')) {
+            sidebar.classList.remove('open');
+            sidebar.classList.add('slide-out');
+            setTimeout(() => sidebar.classList.remove('slide-out'), 300);
+          } else {
+            sidebar.classList.add('open', 'slide-in');
+          }
+          document.getElementById('admin-panel').classList.remove('open');
+        });
+
         document.getElementById('create-board').addEventListener('click', async () => {
           try {
+            if (!currentUser) throw new Error('Пользователь не аутентифицирован');
             const boardRef = await addDoc(collection(db, 'boards'), {
               name: `Доска ${new Date().toLocaleString('ru-RU')}`,
               owner: currentUser.uid,
               users: [currentUser.uid],
-              roles: ['Администратор', 'Разработчик', 'Дизайнер'],
+              roleAssignments: {}, // Хранит пары { роль: uid }
               canvases: { 'Общий': [] }
             });
             currentBoardId = boardRef.id;
             document.getElementById('board-modal').classList.add('hidden');
             document.getElementById('canvas-container').classList.remove('hidden');
-            document.getElementById('sidebar').classList.remove('hidden');
+            sidebar.classList.remove('hidden');
             initBoard();
             console.log('Created board:', currentBoardId);
           } catch (error) {
             console.error('Error creating board:', error);
+            alert('Ошибка создания доски: ' + error.message);
           }
         });
 
-        // Присоединение по ссылке
         document.getElementById('join-board').addEventListener('click', async () => {
           try {
             const link = document.getElementById('join-link').value.trim();
@@ -384,7 +386,7 @@
               currentBoardId = boardId;
               document.getElementById('board-modal').classList.add('hidden');
               document.getElementById('canvas-container').classList.remove('hidden');
-              document.getElementById('sidebar').classList.remove('hidden');
+              sidebar.classList.remove('hidden');
               initBoard();
               console.log('Joined board:', boardId);
             } else {
@@ -392,10 +394,10 @@
             }
           } catch (error) {
             console.error('Error joining board:', error);
+            alert('Ошибка присоединения к доске: ' + error.message);
           }
         });
 
-        // Загрузка досок пользователя
         async function loadUserBoards() {
           try {
             const boardsList = document.getElementById('boards-list');
@@ -411,7 +413,7 @@
                 currentBoardId = doc.id;
                 document.getElementById('board-modal').classList.add('hidden');
                 document.getElementById('canvas-container').classList.remove('hidden');
-                document.getElementById('sidebar').classList.remove('hidden');
+                sidebar.classList.remove('hidden');
                 initBoard();
                 loadUserBoards();
               });
@@ -420,11 +422,27 @@
             console.log('Loaded user boards');
           } catch (error) {
             console.error('Error loading boards:', error);
+            alert('Ошибка загрузки досок: ' + error.message);
           }
         }
 
-        // Инициализация доски
-        let stage, backgroundLayer, transformerLayer, transformer, canvases, currentCanvas, roles, rolesList;
+        async function loadBoardUsers() {
+          const userSelect = document.getElementById('user-select');
+          userSelect.innerHTML = '<option value="">Выберите пользователя</option>';
+          const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+          if (boardDoc.exists()) {
+            const users = boardDoc.data().users || [];
+            for (const uid of users) {
+              const userDoc = await getDoc(doc(db, 'users', uid));
+              const option = document.createElement('option');
+              option.value = uid;
+              option.textContent = userDoc.exists() ? userDoc.data().email || 'Пользователь' : uid;
+              userSelect.appendChild(option);
+            }
+          }
+        }
+
+        let stage, backgroundLayer, transformerLayer, transformer, canvases, currentCanvas, roleAssignments;
         async function initBoard() {
           stage = new Konva.Stage({
             container: 'canvas-container',
@@ -479,11 +497,11 @@
 
           canvases = { 'Общий': new Konva.Layer() };
           currentCanvas = 'Общий';
-          rolesList = document.getElementById('roles-list');
+          const rolesList = document.getElementById('roles-list');
 
           const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
           const boardData = boardDoc.data();
-          roles = boardData.roles || ['Администратор', 'Разработчик', 'Дизайнер'];
+          roleAssignments = boardData.roleAssignments || {};
           Object.keys(boardData.canvases || {}).forEach(role => {
             canvases[role] = new Konva.Layer();
             boardData.canvases[role].forEach(item => {
@@ -492,6 +510,10 @@
             });
           });
           stage.add(canvases[currentCanvas]);
+
+          const isOwner = boardData.owner === currentUser.uid;
+          document.getElementById('toggle-admin').classList.toggle('hidden', !isOwner);
+          if (isOwner) loadBoardUsers();
           updateRolesList();
 
           function createGroupFromData(data) {
@@ -581,7 +603,7 @@
 
           function updateRolesList() {
             rolesList.innerHTML = '';
-            const allCanvases = ['Общий', ...roles];
+            const allCanvases = ['Общий', ...Object.keys(roleAssignments)];
             allCanvases.forEach(role => {
               const li = document.createElement('li');
               li.className = `p-2 rounded cursor-pointer transition ${role === currentCanvas ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} fade-in`;
@@ -605,7 +627,8 @@
           function updateTaskRoleSelect() {
             const taskRoleSelect = document.getElementById('task-role');
             taskRoleSelect.innerHTML = '<option value="">Выберите роль</option>';
-            roles.forEach(role => {
+            const allRoles = ['Общий', ...Object.keys(roleAssignments)];
+            allRoles.forEach(role => {
               const option = document.createElement('option');
               option.value = role;
               option.textContent = role;
@@ -638,9 +661,27 @@
                 } : { content: group.findOne('Text').attrs },
               }));
             });
-            await updateDoc(doc(db, 'boards', currentBoardId), {
+
+            const boardDocRef = doc(db, 'boards', currentBoardId);
+            const boardDoc = await getDoc(boardDocRef);
+            if (!boardDoc.exists()) {
+              console.error('Board does not exist:', currentBoardId);
+              alert('Доска не найдена');
+              return;
+            }
+
+            const isOwner = boardDoc.data().owner === currentUser.uid;
+            const assignedUser = roleAssignments[currentCanvas];
+
+            if (currentCanvas !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
+              console.error('Permission denied: User cannot edit this canvas', { canvas: currentCanvas, user: currentUser.uid });
+              alert('У вас нет прав для редактирования этого холста');
+              return;
+            }
+
+            await updateDoc(boardDocRef, {
               canvases: canvasData,
-              roles: roles,
+              roleAssignments: roleAssignments,
             });
             console.log('Board saved:', currentBoardId);
           }
@@ -653,6 +694,15 @@
             contextPos = stage.getPointerPosition();
             const intersection = stage.getIntersection(contextPos);
             contextTarget = null;
+
+            const boardDoc = getDocFromCache(doc(db, 'boards', currentBoardId));
+            const isOwner = boardDoc?.data()?.owner === currentUser.uid;
+            const assignedUser = roleAssignments[currentCanvas];
+
+            if (currentCanvas !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
+              console.log('Context menu blocked: User lacks permission for canvas', currentCanvas);
+              return;
+            }
 
             if (intersection) {
               const parent = intersection.getParent();
@@ -725,12 +775,17 @@
               return;
             }
 
+            const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+            const isOwner = boardDoc.data().owner === currentUser.uid;
+            const assignedUser = roleAssignments[role];
+
+            if (role !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
+              alert('У вас нет прав для редактирования этого холста');
+              return;
+            }
+
             if (!canvases[role]) {
               canvases[role] = new Konva.Layer();
-              if (role !== 'Общий' && !roles.includes(role)) {
-                roles.push(role);
-                updateRolesList();
-              }
             }
 
             let card;
@@ -804,13 +859,6 @@
 
               card.add(bg, titleText, descText, statusText);
               canvases[role].add(card);
-
-              console.log('Created task card:', {
-                id: card.id(),
-                name: card.name(),
-                textNodes: card.find('.Text').length,
-                children: card.getChildren().map(child => child.getClassName()),
-              });
 
               card.on('dblclick', () => {
                 if (card.name() !== 'task') return;
@@ -895,12 +943,17 @@
               return;
             }
 
+            const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+            const isOwner = boardDoc.data().owner === currentUser.uid;
+            const assignedUser = roleAssignments[role];
+
+            if (role !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
+              alert('У вас нет прав для редактирования этого холста');
+              return;
+            }
+
             if (!canvases[role]) {
               canvases[role] = new Konva.Layer();
-              if (role !== 'Общий' && !roles.includes(role)) {
-                roles.push(role);
-                updateRolesList();
-              }
             }
 
             let pdfGroup;
@@ -996,38 +1049,38 @@
             }
           });
 
-document.getElementById('export-board').addEventListener('click', async () => {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  let yOffset = 10;
-  Object.keys(canvases).forEach(role => {
-    doc.text(`Роль: ${role}`, 10, yOffset);
-    yOffset += 10;
-    canvases[role].find('.Group').forEach(group => {
-      const texts = group.find('.Text').map(text => text.text());
-      doc.text(`${group.name()}:`, 10, yOffset);
-      yOffset += 10;
-      texts.forEach(text => {
-        doc.text(text, 15, yOffset);
-        yOffset += 10;
-      });
-      if (group.name() === 'pdf') {
-        group.find('.task').forEach(task => {
-          const taskTexts = task.find('.Text').map(t => t.text());
-          doc.text('Задача в PDF:', 15, yOffset);
-          yOffset += 10;
-          taskTexts.forEach(t => {
-            doc.text(t, 20, yOffset);
-            yOffset += 10;
+          document.getElementById('export-board').addEventListener('click', async () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            let yOffset = 10;
+            Object.keys(canvases).forEach(role => {
+              doc.text(`Роль: ${role}`, 10, yOffset);
+              yOffset += 10;
+              canvases[role].find('.Group').forEach(group => {
+                const texts = group.find('.Text').map(text => text.text());
+                doc.text(`${group.name()}:`, 10, yOffset);
+                yOffset += 10;
+                texts.forEach(text => {
+                  doc.text(text, 15, yOffset);
+                  yOffset += 10;
+                });
+                if (group.name() === 'pdf') {
+                  group.find('.task').forEach(task => {
+                    const taskTexts = task.find('.Text').map(t => t.text());
+                    doc.text('Задача в PDF:', 15, yOffset);
+                    yOffset += 10;
+                    taskTexts.forEach(t => {
+                      doc.text(t, 20, yOffset);
+                      yOffset += 10;
+                    });
+                  });
+                }
+                yOffset += 10;
+              });
+            });
+            doc.save(`board_${currentBoardId}.pdf`);
+            console.log('Exported board:', currentBoardId);
           });
-        });
-      }
-      yOffset += 10;
-    });
-  });
-  doc.save(`board_${currentBoardId}.pdf`);
-  console.log('Exported board:', currentBoardId);
-});
 
           let editingNote = null;
           document.getElementById('create-note').addEventListener('click', () => {
@@ -1054,12 +1107,17 @@ document.getElementById('export-board').addEventListener('click', async () => {
               return;
             }
 
+            const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+            const isOwner = boardDoc.data().owner === currentUser.uid;
+            const assignedUser = roleAssignments[role];
+
+            if (role !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
+              alert('У вас нет прав для редактирования этого холста');
+              return;
+            }
+
             if (!canvases[role]) {
               canvases[role] = new Konva.Layer();
-              if (role !== 'Общий' && !roles.includes(role)) {
-                roles.push(role);
-                updateRolesList();
-              }
             }
 
             let noteGroup;
@@ -1181,13 +1239,18 @@ document.getElementById('export-board').addEventListener('click', async () => {
               return;
             }
 
+            const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+            const isOwner = boardDoc.data().owner === currentUser.uid;
+            const assignedUser = roleAssignments[role];
+
+            if (role !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
+              alert('У вас нет прав для редактирования этого холста');
+              return;
+            }
+
             const date = new Date().toLocaleString('ru-RU');
             if (!canvases[role]) {
               canvases[role] = new Konva.Layer();
-              if (role !== 'Общий' && !roles.includes(role)) {
-                roles.push(role);
-                updateRolesList();
-              }
             }
 
             let commentGroup;
@@ -1306,12 +1369,17 @@ document.getElementById('export-board').addEventListener('click', async () => {
               return;
             }
 
+            const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+            const isOwner = boardDoc.data().owner === currentUser.uid;
+            const assignedUser = roleAssignments[role];
+
+            if (role !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
+              alert('У вас нет прав для редактирования этого холста');
+              return;
+            }
+
             if (!canvases[role]) {
               canvases[role] = new Konva.Layer();
-              if (role !== 'Общий' && !roles.includes(role)) {
-                roles.push(role);
-                updateRolesList();
-              }
             }
 
             let textGroup;
@@ -1384,6 +1452,15 @@ document.getElementById('export-board').addEventListener('click', async () => {
 
           document.getElementById('delete-element').addEventListener('click', async () => {
             if (contextTarget) {
+              const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+              const isOwner = boardDoc.data().owner === currentUser.uid;
+              const assignedUser = roleAssignments[currentCanvas];
+
+              if (currentCanvas !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
+                alert('У вас нет прав для удаления элементов на этом холсте');
+                return;
+              }
+
               console.log('Deleting:', contextTarget.id(), contextTarget.name());
               contextTarget.destroy();
               transformer.nodes([]);
@@ -1403,7 +1480,7 @@ document.getElementById('export-board').addEventListener('click', async () => {
             } else {
               adminPanel.classList.remove('slide-in', 'open');
             }
-            document.getElementById('sidebar').classList.remove('open');
+            sidebar.classList.remove('open');
           });
 
           document.getElementById('generate-link').addEventListener('click', () => {
@@ -1414,14 +1491,28 @@ document.getElementById('export-board').addEventListener('click', async () => {
 
           document.getElementById('add-role').addEventListener('click', async () => {
             const roleInput = document.getElementById('role-input').value.trim();
-            if (roleInput && !roles.includes(roleInput)) {
-              roles.push(roleInput);
-              canvases[roleInput] = new Konva.Layer();
-              updateRolesList();
-              roleInput.value = '';
-              await saveBoard();
-              console.log('Added role:', roleInput);
+            const userUid = document.getElementById('user-select').value;
+
+            if (!roleInput) {
+              alert('Введите название роли');
+              return;
             }
+            if (!userUid) {
+              alert('Выберите пользователя');
+              return;
+            }
+            if (roleAssignments[roleInput]) {
+              alert('Роль уже существует');
+              return;
+            }
+
+            roleAssignments[roleInput] = userUid;
+            canvases[roleInput] = new Konva.Layer();
+            updateRolesList();
+            document.getElementById('role-input').value = '';
+            document.getElementById('user-select').value = '';
+            await saveBoard();
+            console.log('Added role:', roleInput, 'assigned to:', userUid);
           });
 
           document.getElementById('theme-select').addEventListener('change', e => {
@@ -1508,12 +1599,6 @@ document.getElementById('export-board').addEventListener('click', async () => {
 
           stage.on('touchend', () => {
             lastDist = 0;
-          });
-
-          document.getElementById('hamburger-menu').addEventListener('click', () => {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('open');
-            adminPanel.classList.add('hidden', 'open');
           });
 
           window.addEventListener('resize', () => {
