@@ -12,7 +12,7 @@
     // Импорт Firebase SDK
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
-    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, deleteDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
     // Конфигурация Firebase
     const firebaseConfig = {
@@ -30,189 +30,6 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // Экспорт для использования в глобальном скрипте
-    window.auth = auth;
-    window.db = db;
-  </script>
-  <style>
-    @keyframes slide-in {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes fade-in {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .slide-in { animation: slide-in 0.3s ease-out; }
-    .fade-in { animation: fade-in 0.3s ease-out; }
-    .card-hover:hover { transform: scale(1.02); transition: transform 0.2s ease; }
-    body.light { background-color: #f3f4f6; color: #1f2937; }
-    body.light .bg-gray-800 { background-color: #ffffff; }
-    body.light .bg-gray-700 { background-color: #e5e7eb; }
-    #admin-panel, #auth-panel, #board-panel { z-index: 1000; }
-    #canvas-container { position: relative; overflow: hidden; width: 100%; height: 100%; }
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
-    .modal-content { background: #1a202c; padding: 4px; border-radius: 8px; width: 90%; max-width: 400px; }
-    @media (max-width: 600px) {
-      #sidebar { width: 100%; height: 100%; position: fixed; top: 0; left: 0; transform: translateX(-100%); transition: transform 0.3s ease; z-index: 1500; }
-      #canvas-container { width: 100%; height: calc(100vh - 48px); }
-      .modal-content { width: 95%; padding: 10px; }
-      #admin-panel { width: 100%; height: 100%; position: fixed; top: 0; right: 0; }
-    }
-  </style>
-</head>
-<body class="min-h-screen bg-gray-900 text-white overflow-hidden">
-  <!-- Панель аутентификации -->
-  <div id="auth-panel" class="flex flex-col items-center justify-center min-h-screen w-full bg-gray-800 p-4">
-    <div class="text-center mb-6">
-      <h2 class="text-2xl font-bold sm:text-3xl">Вход или регистрация</h2>
-    </div>
-    <div class="bg-gray-800 p-4 rounded-lg w-full max-w-md">
-      <div id="email-auth">
-        <input id="display-name" type="text" placeholder="Ваше имя" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-        <input id="email" type="email" placeholder="Email" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-        <input id="password" type="password" placeholder="Пароль" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-        <button id="login-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2 text-sm sm:text-base">Войти</button>
-        <button id="register-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full text-sm sm:text-base">Зарегистрироваться</button>
-      </div>
-      <div class="mt-4 text-center">
-        <button id="google-login-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 w-full text-sm sm:text-base">Войти через Google</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Панель выбора доски -->
-  <div id="board-panel" style="display: none;" class="flex flex-col items-center justify-center min-h-screen w-full bg-gray-800 p-4">
-    <div class="bg-gray-800 p-4 rounded-lg w-full max-w-md">
-      <h3 class="text-lg font-bold mb-4 sm:text-xl">Выберите действие</h3>
-      <button id="create-board-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2 text-sm sm:text-base">Создать новую доску</button>
-      <input id="join-link" type="text" placeholder="Вставьте ссылку-приглашение" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-      <button id="join-board-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full text-sm sm:text-base">Присоединиться к доске</button>
-      <button id="export-boards-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 w-full mt-2 text-sm sm:text-base">Экспортировать доски</button>
-      <input id="import-boards" type="file" accept=".json" class="w-full bg-gray-700 p-2 rounded mt-2 text-sm sm:text-base">
-    </div>
-  </div>
-
-  <!-- Боковая панель -->
-  <div id="sidebar" style="display: none;" class="w-full bg-gray-800 p-4 flex flex-col sm:w-64 min-h-screen sm:min-h-screen slide-in">
-    <h2 class="text-lg font-semibold mb-4 sm:text-xl">Роли и холсты</h2>
-    <ul id="roles-list" class="space-y-2"></ul>
-    <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition text-sm sm:text-base">Админ-панель</button>
-    <button id="logout-btn" class="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition text-sm sm:text-base">Выйти</button>
-  </div>
-
-  <!-- Админ-панель -->
-  <div id="admin-panel" style="display: none;" class="w-full bg-gray-800 p-4 absolute right-0 top-0 h-full sm:w-80 sm:h-full">
-    <h2 class="text-lg font-semibold mb-4 sm:text-xl">Админ-панель</h2>
-    <div class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium">Приглашение по ссылке</label>
-        <input id="invite-link" type="text" readonly="readonly" class="w-full bg-gray-700 p-2 rounded text-sm sm:text-sm">
-        <button id="generate-link" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2 w-full text-sm sm:text-base">Сгенерировать ссылку</button>
-      </div>
-      <div>
-        <label class="block text-sm font-medium">Добавить роль</label>
-        <input id="role-input" type="text" placeholder="Введите роль" class="w-full bg-gray-700 p-2 rounded text-sm sm:text-sm">
-        <button id="add-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2 w-full text-sm sm:text-base">Добавить</button>
-      </div>
-      <div>
-        <label class="block text-sm font-medium">Назначить роль</label>
-        <select id="member-select" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-sm"></select>
-        <select id="role-select" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-sm"></select>
-        <button id="assign-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full text-sm sm:text-base">Назначить</button>
-      </div>
-      <div>
-        <label class="block text-sm font-medium">Тема интерфейса</label>
-        <select id="theme-select" class="w-full bg-gray-700 p-2 rounded text-sm sm:text-sm">
-          <option value="dark">Тёмная</option>
-          <option value="light">Светлая</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <!-- Холст -->
-  <div id="canvas-container" style="display: none;" class="flex-1 bg-gray-700 relative"></div>
-
-  <!-- Контекстное меню -->
-  <div id="context-menu" style="display: none;" class="absolute bg-gray-800 text-white rounded shadow-lg p-2 z-10">
-    <button id="create-task" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать задачу</button>
-    <button id="create-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать PDF</button>
-    <button id="create-note" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать заметку</button>
-    <button id="create-comment" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать комментарий</button>
-    <button id="create-text" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать текст</button>
-    <button id="delete-element" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Удалить</button>
-    <button id="export-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Экспортировать в PDF</button>
-  </div>
-
-  <!-- Модальные окна -->
-  <div id="task-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h3 class="text-lg font-bold mb-4">Создать/Редактировать задачу</h3>
-      <input id="task-title" type="text" placeholder="Заголовок задачи" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-      <textarea id="task-desc" placeholder="Описание задачи" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
-      <select id="task-status" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-        <option value="К выполнению">К выполнению</option>
-        <option value="В процессе">В процессе</option>
-        <option value="Завершено">Завершено</option>
-      </select>
-      <select id="task-role" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-        <option value="">Выберите роль</option>
-      </select>
-      <div class="flex justify-end space-x-2">
-        <button id="cancel-task" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-task" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="pdf-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h3 class="text-lg font-bold mb-4">Создать/Редактировать PDF</h3>
-      <textarea id="pdf-content" placeholder="Содержимое PDF" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
-      <div class="flex justify-end space-x-2">
-        <button id="cancel-pdf" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-pdf" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="note-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h3 class="text-lg font-bold mb-4">Создать/Редактировать заметку</h3>
-      <input id="note-title" type="text" placeholder="Заголовок заметки" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-      <textarea id="note-content" placeholder="Содержимое заметки" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
-      <div class="flex justify-end space-x-2">
-        <button id="cancel-note" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-note" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="comment-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h3 class="text-lg font-bold mb-4">Создать/Редактировать комментарий</h3>
-      <input id="comment-author" type="text" placeholder="Автор" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-      <textarea id="comment-content" placeholder="Текст комментария" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
-      <div class="flex justify-end space-x-2">
-        <button id="cancel-comment" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-comment" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="text-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h3 class="text-lg font-bold mb-4">Создать/Редактировать текст</h3>
-      <textarea id="text-content" placeholder="Введите текст" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
-      <div class="flex justify-end space-x-2">
-        <button id="cancel-text" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-text" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
     // DOM элементы
     const authPanel = document.getElementById('auth-panel');
     const boardPanel = document.getElementById('board-panel');
@@ -229,7 +46,10 @@
     let boardRoles = {};
     let canvases = {};
     let currentCanvas = 'Common';
-    let stage, backgroundLayer, transformerLayer, transformer;
+    let stage = null;
+    let backgroundLayer = null;
+    let transformerLayer = null;
+    let transformer = null;
     let lastGridUpdate = 0;
 
     // Утилита для дебаунсинга
@@ -268,14 +88,14 @@
           backgroundLayer.add(new Konva.Line({
             points: [startX, y, endX, y],
             stroke: 'rgba(255, 255, 255, 0.2)',
-            strokeWidth: 1 / scale,
+            strokeWidth: 1 / scale
           }));
         }
         for (let x = startX; x < endX; x += gridSpacing) {
           backgroundLayer.add(new Konva.Line({
             points: [x, startY, x, endY],
             stroke: 'rgba(255, 255, 255, 0.2)',
-            strokeWidth: 1 / scale,
+            strokeWidth: 1 / scale
           }));
         }
         backgroundLayer.batchDraw();
@@ -371,7 +191,7 @@
         const boardRef = await addDoc(collection(db, 'boards'), {
           name: boardName,
           inviteLink: '',
-          roles: { 'Common': { readOnly: false }, 'User': { readOnly: false } },
+          roles: { Common: { readOnly: false }, User: { readOnly: false } },
           members: { [currentUser.uid]: { role: 'User', displayName: currentUser.displayName || currentUser.email } }
         });
 
@@ -382,7 +202,7 @@
         currentBoardId = boardId;
         isAdmin = false;
         userRole = 'User';
-        boardRoles = { 'Common': { readOnly: false }, 'User': { readOnly: false } };
+        boardRoles = { Common: { readOnly: false }, User: { readOnly: false } };
 
         boardPanel.style.display = 'none';
         sidebar.style.display = 'flex';
@@ -511,7 +331,7 @@
         transformerLayer.add(transformer);
         stage.add(transformerLayer);
 
-        canvases = { 'Common': new Konva.Layer() };
+        canvases = { Common: new Konva.Layer() };
         Object.keys(boardRoles).forEach(role => {
           if (role !== 'Common') canvases[role] = new Konva.Layer();
         });
@@ -798,9 +618,7 @@
             const role = roleInput.value.trim();
             if (role && !boardRoles[role]) {
               boardRoles[role] = { readOnly: false };
-              await updateDoc(doc(db, 'boards', currentBoardId), {
-                roles: boardRoles
-              });
+              await updateDoc(doc(db, 'boards', currentBoardId), { roles: boardRoles });
               updateRolesList();
               roleInput.value = '';
               console.log('Добавлена роль:', role);
@@ -1435,5 +1253,182 @@
       }
     }
   </script>
+  <style>
+    @keyframes slide-in {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .slide-in { animation: slide-in 0.3s ease-out; }
+    .fade-in { animation: fade-in 0.3s ease-out; }
+    .card-hover:hover { transform: scale(1.02); transition: transform 0.2s ease; }
+    body.light { background-color: #f3f4f6; color: #1f2937; }
+    body.light .bg-gray-800 { background-color: #ffffff; }
+    body.light .bg-gray-700 { background-color: #e5e7eb; }
+    #admin-panel, #auth-panel, #board-panel { z-index: 1000; }
+    #canvas-container { position: relative; overflow: hidden; width: 100%; height: 100%; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+    .modal-content { background: #1a202c; padding: 4px; border-radius: 8px; width: 90%; max-width: 400px; }
+    @media (max-width: 600px) {
+      #sidebar { width: 100%; height: 100%; position: fixed; top: 0; left: 0; transform: translateX(-100%); transition: transform 0.3s ease; z-index: 1500; }
+      #canvas-container { width: 100%; height: calc(100vh - 48px); }
+      .modal-content { width: 95%; padding: 10px; }
+      #admin-panel { width: 100%; height: 100%; position: fixed; top: 0; right: 0; }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-900 text-white overflow-hidden">
+  <!-- Панель аутентификации -->
+  <div id="auth-panel" class="flex flex-col items-center justify-center min-h-screen w-full bg-gray-800 p-4">
+    <div class="text-center mb-6">
+      <h2 class="text-2xl font-bold sm:text-3xl">Вход или регистрация</h2>
+    </div>
+    <div class="bg-gray-800 p-4 rounded-lg w-full max-w-md">
+      <div id="email-auth">
+        <input id="display-name" type="text" placeholder="Ваше имя" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+        <input id="email" type="email" placeholder="Email" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+        <input id="password" type="password" placeholder="Пароль" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+        <button id="login-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2 text-sm sm:text-base">Войти</button>
+        <button id="register-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full text-sm sm:text-base">Зарегистрироваться</button>
+      </div>
+      <div class="mt-4 text-center">
+        <button id="google-login-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 w-full text-sm sm:text-base">Войти через Google</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Панель выбора доски -->
+  <div id="board-panel" style="display: none;" class="flex flex-col items-center justify-center min-h-screen w-full bg-gray-800 p-4">
+    <div class="bg-gray-800 p-4 rounded-lg w-full max-w-md">
+      <h3 class="text-lg font-bold mb-4 sm:text-xl">Выберите действие</h3>
+      <button id="create-board-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2 text-sm sm:text-base">Создать новую доску</button>
+      <input id="join-link" type="text" placeholder="Вставьте ссылку-приглашение" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+      <button id="join-board-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full text-sm sm:text-base">Присоединиться к доске</button>
+      <button id="export-boards-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 w-full mt-2 text-sm sm:text-base">Экспортировать доски</button>
+      <input id="import-boards" type="file" accept=".json" class="w-full bg-gray-700 p-2 rounded mt-2 text-sm sm:text-base">
+    </div>
+  </div>
+
+  <!-- Боковая панель -->
+  <div id="sidebar" style="display: none;" class="w-full bg-gray-800 p-4 flex flex-col sm:w-64 min-h-screen sm:min-h-screen slide-in">
+    <h2 class="text-lg font-semibold mb-4 sm:text-xl">Роли и холсты</h2>
+    <ul id="roles-list" class="space-y-2"></ul>
+    <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition text-sm sm:text-base">Админ-панель</button>
+    <button id="logout-btn" class="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition text-sm sm:text-base">Выйти</button>
+  </div>
+
+  <!-- Админ-панель -->
+  <div id="admin-panel" style="display: none;" class="w-full bg-gray-800 p-4 absolute right-0 top-0 h-full sm:w-80 sm:h-full">
+    <h2 class="text-lg font-semibold mb-4 sm:text-xl">Админ-панель</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium">Приглашение по ссылке</label>
+        <input id="invite-link" type="text" readonly class="w-full bg-gray-700 p-2 rounded text-sm sm:text-sm">
+        <button id="generate-link" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2 w-full text-sm sm:text-base">Сгенерировать ссылку</button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Добавить роль</label>
+        <input id="role-input" type="text" placeholder="Введите роль" class="w-full bg-gray-700 p-2 rounded text-sm sm:text-sm">
+        <button id="add-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2 w-full text-sm sm:text-base">Добавить</button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Назначить роль</label>
+        <select id="member-select" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-sm"></select>
+        <select id="role-select" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-sm"></select>
+        <button id="assign-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full text-sm sm:text-base">Назначить</button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Тема интерфейса</label>
+        <select id="theme-select" class="w-full bg-gray-700 p-2 rounded text-sm sm:text-sm">
+          <option value="dark">Тёмная</option>
+          <option value="light">Светлая</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Холст -->
+  <div id="canvas-container" style="display: none;" class="flex-1 bg-gray-700 relative"></div>
+
+  <!-- Контекстное меню -->
+  <div id="context-menu" style="display: none;" class="absolute bg-gray-800 text-white rounded shadow-lg p-2 z-10">
+    <button id="create-task" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать задачу</button>
+    <button id="create-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать PDF</button>
+    <button id="create-note" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать заметку</button>
+    <button id="create-comment" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать комментарий</button>
+    <button id="create-text" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать текст</button>
+    <button id="delete-element" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Удалить</button>
+    <button id="export-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Экспортировать в PDF</button>
+  </div>
+
+  <!-- Модальные окна -->
+  <div id="task-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать задачу</h3>
+      <input id="task-title" type="text" placeholder="Заголовок задачи" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+      <textarea id="task-desc" placeholder="Описание задачи" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
+      <select id="task-status" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+        <option value="К выполнению">К выполнению</option>
+        <option value="В процессе">В процессе</option>
+        <option value="Завершено">Завершено</option>
+      </select>
+      <select id="task-role" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+        <option value="">Выберите роль</option>
+      </select>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-task" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
+        <button id="save-task" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pdf-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать PDF</h3>
+      <textarea id="pdf-content" placeholder="Содержимое PDF" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-pdf" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
+        <button id="save-pdf" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="note-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать заметку</h3>
+      <input id="note-title" type="text" placeholder="Заголовок заметки" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+      <textarea id="note-content" placeholder="Содержимое заметки" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-note" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
+        <button id="save-note" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="comment-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать комментарий</h3>
+      <input id="comment-author" type="text" placeholder="Автор" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+      <textarea id="comment-content" placeholder="Текст комментария" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-comment" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
+      <button id="save-comment" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="text-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold mb-4">Создать/Редактировать текст</h3>
+      <textarea id="text-content" placeholder="Введите текст" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-text" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
+        <button id="save-text" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
