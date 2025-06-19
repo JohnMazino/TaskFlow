@@ -13,7 +13,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
     import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-analytics.js";
 
     // Конфигурация Firebase
     const firebaseConfig = {
@@ -28,7 +27,6 @@
 
     // Инициализация Firebase
     const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
@@ -57,8 +55,6 @@
     .modal-content { background: #1a202c; padding: 4px; border-radius: 8px; width: 90%; max-width: 400px; }
     @media (max-width: 600px) {
       #sidebar { width: 100%; height: 100%; position: fixed; top: 0; left: 0; transform: translateX(-100%); transition: transform 0.3s ease; z-index: 1500; }
-      #sidebar.active { transform: translateX(0); }
-      #menu-btn { display: block; position: fixed; top: 4px; left: 4px; z-index: 1600; }
       #canvas-container { width: 100%; height: calc(100vh - 48px); }
       .modal-content { width: 95%; padding: 10px; }
       #admin-panel { width: 100%; height: 100%; position: fixed; top: 0; right: 0; }
@@ -66,13 +62,6 @@
   </style>
 </head>
 <body class="min-h-screen bg-gray-900 text-white overflow-hidden">
-  <!-- Кнопка меню (мобильная версия) -->
-  <button id="menu-btn" class="fixed top-4 left-4 z-50 p-2 bg-blue-600 text-white hidden sm:block rounded-md hover:bg-blue-700">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  </button>
-
   <!-- Панель аутентификации -->
   <div id="auth-panel" class="flex flex-col items-center justify-center min-h-screen w-full bg-gray-800 p-4">
     <div class="text-center mb-6">
@@ -98,8 +87,8 @@
       <h3 class="text-lg font-bold mb-4 sm:text-xl">Выберите действие</h3>
       <button id="create-board-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2 text-sm sm:text-base">Создать новую доску</button>
       <input id="join-link" type="text" placeholder="Вставьте ссылку-приглашение" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-      <button id="join-board-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full text-sm:text-base">Присоединиться к доске</button>
-      <button id="export-boards-btn" class="bg-purple-600 text-white px-4 py-2:bg-purple-700 w-full mt-2 text-sm sm:text-base">Экспортировать доски</button>
+      <button id="join-board-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full text-sm sm:text-base">Присоединиться к доске</button>
+      <button id="export-boards-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 w-full mt-2 text-sm sm:text-base">Экспортировать доски</button>
       <input id="import-boards" type="file" accept=".json" class="w-full bg-gray-700 p-2 rounded mt-2 text-sm sm:text-base">
     </div>
   </div>
@@ -231,7 +220,6 @@
     const canvasContainer = document.getElementById('canvas-container');
     const rolesList = document.getElementById('roles-list');
     const contextMenu = document.getElementById('context-menu');
-    const menuBtn = document.getElementById('menu-btn');
 
     // Состояние
     let currentUser = null;
@@ -317,7 +305,6 @@
           boardPanel.style.display = 'none';
           sidebar.style.display = 'none';
           canvasContainer.style.display = 'none';
-          menuBtn.style.display = 'none';
           console.log('Пользователь не аутентифицирован');
         }
       } catch (error) {
@@ -400,7 +387,6 @@
         boardPanel.style.display = 'none';
         sidebar.style.display = 'flex';
         canvasContainer.style.display = 'flex';
-        menuBtn.style.display = 'block';
         initBoard();
         console.log('Доска создана:', boardId);
       } catch (error) {
@@ -438,7 +424,6 @@
         boardPanel.style.display = 'none';
         sidebar.style.display = 'flex';
         canvasContainer.style.display = 'flex';
-        menuBtn.style.display = 'block';
         initBoard();
         console.log('Присоединился к доске:', boardId, 'Пользователь:', currentUser.displayName || currentUser.email);
       } catch (error) {
@@ -506,7 +491,7 @@
         stage = new Konva.Stage({
           container: 'canvas-container',
           width: window.innerWidth - (window.innerWidth < 768 ? 0 : 256),
-          height: window.innerHeight - (window.innerWidth < 600 ? 48 : 0)
+          height: window.innerHeight
         });
 
         backgroundLayer = new Konva.Layer({ listening: false });
@@ -607,7 +592,7 @@
       if (data.type === 'task') {
         const titleText = new Konva.Text({
           x: 8,
-          yXOR: y: 8,
+          y: 8,
           text: data.title,
           fontSize: 12,
           fontFamily: 'Arial',
@@ -793,11 +778,6 @@
     // Настройка обработчиков событий
     function setupEventListeners() {
       try {
-        // Переключение меню (мобильная версия)
-        menuBtn.addEventListener('click', () => {
-          sidebar.classList.toggle('active');
-        });
-
         // Переключение админ-панели
         document.getElementById('toggle-admin').addEventListener('click', () => {
           const adminPanel = document.getElementById('admin-panel');
@@ -1354,7 +1334,7 @@
         // Изменение размера окна
         window.addEventListener('resize', () => {
           stage.width(window.innerWidth - (window.innerWidth < 768 ? 0 : 256));
-          stage.height(window.innerHeight - (window.innerWidth < 600 ? 48 : 0));
+          stage.height(window.innerHeight);
           updateGrid(stage, backgroundLayer);
           stage.batchDraw();
         });
