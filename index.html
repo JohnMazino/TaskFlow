@@ -137,7 +137,6 @@
     <button id="create-comment" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать комментарий</button>
     <button id="create-text" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать текст</button>
     <button id="delete-element" class="block px-4 py-2 hover:bg-gray-600 w-full text-left hidden">Удалить</button>
-    <button id="export-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left hidden">Экспортировать PDF</button>
   </div>
 
   <!-- Модальное окно для задачи -->
@@ -246,7 +245,7 @@
     let isSignInMode = true;
     let unsubscribeBoardSnapshot = null;
 
-    window.onload = async () => {
+    window.onload = async function() {
       console.log('DOM loaded, initializing app...');
       try {
         if (!window.Konva) throw new Error('Konva.js not loaded');
@@ -274,7 +273,7 @@
 
         toggleAuthMode.addEventListener('click', toggleAuthModeUI);
 
-        authSubmit.addEventListener('click', async () => {
+        authSubmit.addEventListener('click', async function() {
           const email = emailInput.value.trim();
           const password = passwordInput.value.trim();
           authError.classList.add('hidden');
@@ -309,7 +308,7 @@
           }
         });
 
-        onAuthStateChanged(auth, user => {
+        onAuthStateChanged(auth, function(user) {
           if (user) {
             currentUser = user;
             authModal.classList.add('hidden');
@@ -327,7 +326,7 @@
           }
         });
 
-        document.getElementById('google-signin').addEventListener('click', async () => {
+        document.getElementById('google-signin').addEventListener('click', async function() {
           try {
             const provider = new GoogleAuthProvider();
             await signInWithPopup(auth, provider);
@@ -338,7 +337,7 @@
           }
         });
 
-        document.getElementById('logout').addEventListener('click', async () => {
+        document.getElementById('logout').addEventListener('click', async function() {
           try {
             await signOut(auth);
             console.log('User signed out');
@@ -350,18 +349,18 @@
           }
         });
 
-        hamburgerMenu.addEventListener('click', () => {
+        hamburgerMenu.addEventListener('click', function() {
           if (sidebar.classList.contains('open')) {
             sidebar.classList.remove('open', 'slide-in');
             sidebar.classList.add('slide-out');
-            setTimeout(() => sidebar.classList.remove('slide-out'), 300);
+            setTimeout(function() { sidebar.classList.remove('slide-out'); }, 300);
           } else {
             sidebar.classList.add('open', 'slide-in');
             document.getElementById('admin-panel').classList.remove('open', 'slide-in');
           }
         });
 
-        document.getElementById('create-board').addEventListener('click', async () => {
+        document.getElementById('create-board').addEventListener('click', async function() {
           const boardName = document.getElementById('board-name-input').value.trim();
           if (!boardName) {
             alert('Введите название доски');
@@ -380,7 +379,7 @@
             document.getElementById('board-modal').classList.add('hidden');
             document.getElementById('canvas-container').classList.remove('hidden');
             sidebar.classList.remove('hidden');
-            initBoard();
+            await initBoard();
             console.log('Created board:', currentBoardId);
           } catch (error) {
             console.error('Error creating board:', error);
@@ -388,7 +387,7 @@
           }
         });
 
-        document.getElementById('join-board').addEventListener('click', async () => {
+        document.getElementById('join-board').addEventListener('click', async function() {
           try {
             const link = document.getElementById('join-link').value.trim();
             const boardId = link.split('/').pop();
@@ -401,7 +400,7 @@
               document.getElementById('board-modal').classList.add('hidden');
               document.getElementById('canvas-container').classList.remove('hidden');
               sidebar.classList.remove('hidden');
-              initBoard();
+              await initBoard();
               console.log('Joined board:', boardId);
             } else {
               alert('Доска не найдена');
@@ -412,7 +411,7 @@
           }
         });
 
-        document.getElementById('back-to-boards').addEventListener('click', () => {
+        document.getElementById('back-to-boards').addEventListener('click', function() {
           document.getElementById('canvas-container').classList.add('hidden');
           document.getElementById('sidebar').classList.add('hidden');
           document.getElementById('board-modal').classList.remove('hidden');
@@ -427,17 +426,17 @@
             boardsList.innerHTML = '';
             const q = query(collection(db, 'boards'), where('users', 'array-contains', currentUser.uid));
             const querySnapshot = await getDocs(q);
-            querySnapshot.forEach(doc => {
+            querySnapshot.forEach(function(doc) {
               const board = doc.data();
               const div = document.createElement('div');
               div.className = `p-2 rounded cursor-pointer transition ${doc.id === currentBoardId ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} fade-in`;
               div.textContent = board.name;
-              div.addEventListener('click', () => {
+              div.addEventListener('click', async function() {
                 currentBoardId = doc.id;
                 document.getElementById('board-modal').classList.add('hidden');
                 document.getElementById('canvas-container').classList.remove('hidden');
                 sidebar.classList.remove('hidden');
-                initBoard();
+                await initBoard();
                 loadUserBoards();
               });
               boardsList.appendChild(div);
@@ -456,7 +455,7 @@
           if (boardDoc.exists()) {
             const users = boardDoc.data().users || [];
             for (const uid of users) {
-              const user = await auth.getUser(uid).catch(() => null);
+              const user = await auth.getUser(uid).catch(function() { return null; });
               const option = document.createElement('option');
               option.value = uid;
               option.textContent = user ? (user.displayName || user.email || uid) : uid;
@@ -465,16 +464,15 @@
           }
         }
 
-        let stage, backgroundLayer, transformerLayer, transformer, canvases, currentCanvas, roleAssignments;
         async function initBoard() {
           if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
-          stage = new Konva.Stage({
+          const stage = new Konva.Stage({
             container: 'canvas-container',
             width: window.innerWidth - (window.innerWidth <= 768 ? 0 : 256),
             height: window.innerHeight,
           });
 
-          backgroundLayer = new Konva.Layer({ listening: false });
+          const backgroundLayer = new Konva.Layer({ listening: false });
           const gridSpacing = 50;
           function updateGrid() {
             backgroundLayer.destroyChildren();
@@ -506,12 +504,12 @@
           stage.add(backgroundLayer);
           updateGrid();
 
-          transformerLayer = new Konva.Layer();
-          transformer = new Konva.Transformer({
+          const transformerLayer = new Konva.Layer();
+          const transformer = new Konva.Transformer({
             nodes: [],
             keepRatio: false,
             enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
-            boundBoxFunc: (oldBox, newBox) => {
+            boundBoxFunc: function(oldBox, newBox) {
               if (newBox.width < 50 || newBox.height < 50) return oldBox;
               return newBox;
             },
@@ -519,16 +517,17 @@
           transformerLayer.add(transformer);
           stage.add(transformerLayer);
 
-          canvases = { 'Общий': new Konva.Layer() };
-          currentCanvas = 'Общий';
+          let canvases = { 'Общий': new Konva.Layer() };
+          let currentCanvas = 'Общий';
+          let roleAssignments = {};
           const rolesList = document.getElementById('roles-list');
 
           const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
           const boardData = boardDoc.data();
           roleAssignments = boardData.roleAssignments || {};
-          Object.keys(boardData.canvases || {}).forEach(role => {
+          Object.keys(boardData.canvases || {}).forEach(function(role) {
             canvases[role] = new Konva.Layer();
-            boardData.canvases[role].forEach(item => {
+            boardData.canvases[role].forEach(function(item) {
               const group = createGroupFromData(item);
               canvases[role].add(group);
             });
@@ -537,28 +536,28 @@
 
           const isOwner = boardData.owner === currentUser.uid;
           document.getElementById('toggle-admin').classList.toggle('hidden', !isOwner);
-          if (isOwner) loadBoardUsers();
+          if (isOwner) await loadBoardUsers();
           updateRolesList();
 
-          unsubscribeBoardSnapshot = onSnapshot(doc(db, 'boards', currentBoardId), (doc) => {
+          unsubscribeBoardSnapshot = onSnapshot(doc(db, 'boards', currentBoardId), function(doc) {
             if (!doc.exists()) return;
             const data = doc.data();
             roleAssignments = data.roleAssignments || {};
-            Object.keys(canvases).forEach(role => {
+            Object.keys(canvases).forEach(function(role) {
               if (!data.canvases[role]) {
                 canvases[role].destroy();
                 delete canvases[role];
               }
             });
-            Object.keys(data.canvases || {}).forEach(role => {
+            Object.keys(data.canvases || {}).forEach(function(role) {
               if (!canvases[role]) canvases[role] = new Konva.Layer();
               canvases[role].destroyChildren();
-              data.canvases[role].forEach(item => {
+              data.canvases[role].forEach(function(item) {
                 const group = createGroupFromData(item);
                 canvases[role].add(group);
               });
               if (role === currentCanvas) {
-                stage.getLayers().forEach(layer => {
+                stage.getLayers().forEach(function(layer) {
                   if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
                 });
                 stage.add(canvases[role]);
@@ -586,7 +585,7 @@
                 new Konva.Text(data.texts.desc),
                 new Konva.Text(data.texts.status),
               ];
-              group.on('dblclick', () => {
+              group.on('dblclick', function() {
                 if (group.name() !== 'task') return;
                 const texts = group.find('.Text');
                 if (texts.length < 3) {
@@ -603,7 +602,7 @@
               });
             } else if (data.type === 'pdf') {
               textNodes = [new Konva.Text(data.texts.content)];
-              group.on('dblclick', () => {
+              group.on('dblclick', function() {
                 editingPdf = group;
                 document.getElementById('pdf-modal').classList.remove('hidden');
                 document.getElementById('pdf-content').value = textNodes[0].text();
@@ -615,7 +614,7 @@
                 new Konva.Text(data.texts.title),
                 new Konva.Text(data.texts.content),
               ];
-              group.on('dblclick', () => {
+              group.on('dblclick', function() {
                 editingNote = group;
                 document.getElementById('note-modal').classList.remove('hidden');
                 document.getElementById('note-title').value = textNodes[0].text();
@@ -627,7 +626,7 @@
                 new Konva.Text(data.texts.author),
                 new Konva.Text(data.texts.content),
               ];
-              group.on('dblclick', () => {
+              group.on('dblclick', function() {
                 editingComment = group;
                 document.getElementById('comment-modal').classList.remove('hidden');
                 document.getElementById('comment-author').value = textNodes[0].text().replace(/ \(.*\)/, '');
@@ -636,7 +635,7 @@
               });
             } else if (data.type === 'text') {
               textNodes = [new Konva.Text(data.texts.content)];
-              group.on('dblclick', () => {
+              group.on('dblclick', function() {
                 editingText = group;
                 document.getElementById('text-modal').classList.remove('hidden');
                 document.getElementById('text-content').value = textNodes[0].text();
@@ -645,10 +644,10 @@
             }
 
             group.add(bg, ...textNodes);
-            group.on('transform', () => {
+            group.on('transform', function() {
               bg.width(group.width() / group.scaleX());
               bg.height(group.height() / group.scaleY());
-              textNodes.forEach(text => text.width(bg.width() - 20));
+              textNodes.forEach(function(text) { text.width(bg.width() - 20); });
               if (data.type === 'task') textNodes[2].y(bg.height() - 30);
             });
             group.on('dragend', saveBoard);
@@ -659,14 +658,14 @@
             const rolesList = document.getElementById('roles-list');
             rolesList.innerHTML = '';
             const allCanvases = ['Общий', ...Object.keys(roleAssignments)];
-            allCanvases.forEach(role => {
+            allCanvases.forEach(function(role) {
               const li = document.createElement('li');
               li.className = `p-2 rounded cursor-pointer transition ${role === currentCanvas ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} fade-in`;
               li.textContent = role;
-              li.addEventListener('click', () => {
+              li.addEventListener('click', function() {
                 if (!canvases[role]) canvases[role] = new Konva.Layer();
                 currentCanvas = role;
-                stage.getLayers().forEach(layer => {
+                stage.getLayers().forEach(function(layer) {
                   if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
                 });
                 stage.add(canvases[role]);
@@ -683,7 +682,7 @@
             const taskRoleSelect = document.getElementById('task-role');
             taskRoleSelect.innerHTML = '<option value="">Выберите роль</option>';
             const allRoles = ['Общий', ...Object.keys(roleAssignments)];
-            allRoles.forEach(role => {
+            allRoles.forEach(function(role) {
               const option = document.createElement('option');
               option.value = role;
               option.textContent = role;
@@ -693,28 +692,30 @@
 
           async function saveBoard() {
             const canvasData = {};
-            Object.keys(canvases).forEach(role => {
-              canvasData[role] = canvases[role].find('.Group').map(group => ({
-                id: group.id(),
-                type: group.name(),
-                x: group.x(),
-                y: group.y(),
-                role: role,
-                bg: group.findOne('Rect').attrs,
-                texts: group.name() === 'task' ? {
-                  title: group.find('.Text')[0].attrs,
-                  desc: group.find('.Text')[1].attrs,
-                  status: group.find('.Text')[2].attrs,
-                } : group.name() === 'pdf' ? {
-                  content: group.findOne('Text').attrs,
-                } : group.name() === 'note' ? {
-                  title: group.find('.Text')[0].attrs,
-                  content: group.find('.Text')[1].attrs,
-                } : group.name() === 'comment' ? {
-                  author: group.find('.Text')[0].attrs,
-                  content: group.find('.Text')[1].attrs,
-                } : { content: group.findOne('Text').attrs },
-              }));
+            Object.keys(canvases).forEach(function(role) {
+              canvasData[role] = canvases[role].find('.Group').map(function(group) {
+                return {
+                  id: group.id(),
+                  type: group.name(),
+                  x: group.x(),
+                  y: group.y(),
+                  role: role,
+                  bg: group.findOne('Rect').attrs,
+                  texts: group.name() === 'task' ? {
+                    title: group.find('.Text')[0].attrs,
+                    desc: group.find('.Text')[1].attrs,
+                    status: group.find('.Text')[2].attrs,
+                  } : group.name() === 'pdf' ? {
+                    content: group.findOne('Text').attrs,
+                  } : group.name() === 'note' ? {
+                    title: group.find('.Text')[0].attrs,
+                    content: group.find('.Text')[1].attrs,
+                  } : group.name() === 'comment' ? {
+                    author: group.find('.Text')[0].attrs,
+                    content: group.find('.Text')[1].attrs,
+                  } : { content: group.findOne('Text').attrs },
+                };
+              });
             });
 
             const boardDocRef = doc(db, 'boards', currentBoardId);
@@ -744,60 +745,61 @@
           const contextMenu = document.getElementById('context-menu');
           let contextTarget = null;
           let contextPos = { x: 0, y: 0 };
-          stage.on('contextmenu touchend', e => {
+          stage.on('contextmenu touchend', function(e) {
             if (e.evt.type === 'touchend' && e.evt.touches && e.evt.touches.length > 1) return;
             e.evt.preventDefault();
             contextPos = stage.getPointerPosition();
             const intersection = stage.getIntersection(contextPos);
             contextTarget = null;
 
-            const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
-            const isOwner = boardDoc.data().owner === currentUser.uid;
-            const assignedUser = roleAssignments[currentCanvas];
+            (async function() {
+              const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+              const isOwner = boardDoc.data().owner === currentUser.uid;
+              const assignedUser = roleAssignments[currentCanvas];
 
-            if (currentCanvas !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
-              console.log('Context menu blocked: User lacks permission for canvas', currentCanvas);
-              return;
-            }
-
-            if (intersection) {
-              const parent = intersection.getParent();
-              if (parent && parent instanceof Konva.Group && ['task', 'pdf', 'note', 'comment', 'text'].includes(parent.name())) {
-                contextTarget = parent;
+              if (currentCanvas !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
+                console.log('Context menu blocked: User lacks permission for canvas', currentCanvas);
+                return;
               }
-            }
 
-            document.getElementById('create-task').classList.toggle('hidden', !!contextTarget);
-            document.getElementById('create-pdf').classList.toggle('hidden', !!contextTarget);
-            document.getElementById('create-note').classList.toggle('hidden', !!contextTarget);
-            document.getElementById('create-comment').classList.toggle('hidden', !!contextTarget);
-            document.getElementById('create-text').classList.toggle('hidden', !!contextTarget);
-            document.getElementById('delete-element').classList.toggle('hidden', !contextTarget);
-            document.getElementById('export-pdf').classList.toggle('hidden', !contextTarget || contextTarget.name() !== 'pdf');
+              if (intersection) {
+                const parent = intersection.getParent();
+                if (parent && parent instanceof Konva.Group && ['task', 'pdf', 'note', 'comment', 'text'].includes(parent.name())) {
+                  contextTarget = parent;
+                }
+              }
 
-            const clientX = e.evt.clientX || (e.evt.touches && e.evt.touches[0]?.clientX) || 0;
-            const clientY = e.evt.clientY || (e.evt.touches && e.evt.touches[0]?.clientY) || 0;
-            contextMenu.style.left = `${clientX}px`;
-            contextMenu.style.top = `${clientY}px`;
-            contextMenu.classList.remove('hidden');
-            console.log('Opened context menu at:', clientX, clientY, 'target:', contextTarget ? contextTarget.name() : 'none');
+              document.getElementById('create-task').classList.toggle('hidden', !!contextTarget);
+              document.getElementById('create-pdf').classList.toggle('hidden', !!contextTarget);
+              document.getElementById('create-note').classList.toggle('hidden', !!contextTarget);
+              document.getElementById('create-comment').classList.toggle('hidden', !!contextTarget);
+              document.getElementById('create-text').classList.toggle('hidden', !!contextTarget);
+              document.getElementById('delete-element').classList.toggle('hidden', !contextTarget);
+
+              const clientX = e.evt.clientX || (e.evt.touches && e.evt.touches[0]?.clientX) || 0;
+              const clientY = e.evt.clientY || (e.evt.touches && e.evt.touches[0]?.clientY) || 0;
+              contextMenu.style.left = `${clientX}px`;
+              contextMenu.style.top = `${clientY}px`;
+              contextMenu.classList.remove('hidden');
+              console.log('Opened context menu at:', clientX, clientY, 'target:', contextTarget ? contextTarget.name() : 'none');
+            })();
           });
 
-          document.addEventListener('click', e => {
+          document.addEventListener('click', function(e) {
             if (!contextMenu.contains(e.target)) {
               contextMenu.classList.add('hidden');
               contextTarget = null;
             }
           });
 
-          document.addEventListener('touchstart', e => {
+          document.addEventListener('touchstart', function(e) {
             if (!contextMenu.contains(e.target) && e.touches.length === 1) {
               contextMenu.classList.add('hidden');
               contextTarget = null;
             }
           });
 
-          stage.on('click tap', e => {
+          stage.on('click tap', function(e) {
             const pos = stage.getPointerPosition();
             const intersection = stage.getIntersection(pos);
             if (!intersection || intersection.getLayer() === backgroundLayer) {
@@ -815,7 +817,7 @@
           });
 
           let editingTask = null;
-          document.getElementById('create-task').addEventListener('click', () => {
+          document.getElementById('create-task').addEventListener('click', function() {
             contextMenu.classList.add('hidden');
             document.getElementById('task-modal').classList.remove('hidden');
             document.getElementById('task-title').value = '';
@@ -823,13 +825,13 @@
             editingTask = null;
           });
 
-          document.getElementById('cancel-task').addEventListener('click', () => {
+          document.getElementById('cancel-task').addEventListener('click', function() {
             document.getElementById('task-modal').classList.add('hidden');
             document.getElementById('task-title').value = '';
             document.getElementById('task-desc').value = '';
           });
 
-          document.getElementById('save-task').addEventListener('click', async () => {
+          document.getElementById('save-task').addEventListener('click', async function() {
             const title = document.getElementById('task-title').value.trim();
             const desc = document.getElementById('task-desc').value.trim();
             const status = document.getElementById('task-status').value;
@@ -925,7 +927,7 @@
               card.add(bg, titleText, descText, statusText);
               canvases[role].add(card);
 
-              card.on('dblclick', () => {
+              card.on('dblclick', function() {
                 if (card.name() !== 'task') return;
                 const textNodes = card.find('.Text');
                 if (textNodes.length < 3) {
@@ -941,7 +943,7 @@
                 document.getElementById('task-role').value = role;
               });
 
-              card.on('transform', () => {
+              card.on('transform', function() {
                 bg.width(card.width() / card.scaleX());
                 bg.height(card.height() / card.scaleY());
                 titleText.width(bg.width() - 20);
@@ -953,7 +955,7 @@
             }
 
             if (currentCanvas === role) {
-              stage.getLayers().forEach(layer => {
+              stage.getLayers().forEach(function(layer) {
                 if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
               });
               stage.add(canvases[role]);
@@ -966,14 +968,14 @@
           });
 
           let editingPdf = null;
-          document.getElementById('create-pdf').addEventListener('click', () => {
+          document.getElementById('create-pdf').addEventListener('click', function() {
             contextMenu.classList.add('hidden');
             document.getElementById('pdf-modal').classList.remove('hidden');
             document.getElementById('pdf-content').value = '';
             editingPdf = null;
           });
 
-          document.getElementById('cancel-pdf').addEventListener('click', () => {
+          document.getElementById('cancel-pdf').addEventListener('click', function() {
             document.getElementById('pdf-modal').classList.add('hidden');
             document.getElementById('pdf-content').value = '';
           });
@@ -981,7 +983,7 @@
           function handlePdfDragEnd() {
             const pdfPos = this.getAbsolutePosition();
             const pdfSize = { width: this.width(), height: this.height() };
-            canvases[currentCanvas].find('.task').forEach(task => {
+            canvases[currentCanvas].find('.task').forEach(function(task) {
               const taskPos = task.getAbsolutePosition();
               if (
                 taskPos.x >= pdfPos.x &&
@@ -1000,7 +1002,7 @@
             saveBoard();
           }
 
-          document.getElementById('save-pdf').addEventListener('click', async () => {
+          document.getElementById('save-pdf').addEventListener('click', async function() {
             const content = document.getElementById('pdf-content').value.trim();
             const role = document.getElementById('task-role').value || 'Общий';
 
@@ -1062,7 +1064,7 @@
               pdfGroup.add(bg, text);
               canvases[role].add(pdfGroup);
 
-              pdfGroup.on('dblclick', () => {
+              pdfGroup.on('dblclick', function() {
                 editingPdf = pdfGroup;
                 document.getElementById('pdf-modal').classList.remove('hidden');
                 document.getElementById('pdf-content').value = text.text();
@@ -1070,7 +1072,7 @@
               });
 
               pdfGroup.on('dragend', handlePdfDragEnd);
-              pdfGroup.on('transform', () => {
+              pdfGroup.on('transform', function() {
                 bg.width(pdfGroup.width() / pdfGroup.scaleX());
                 bg.height(pdfGroup.height() / pdfGroup.scaleY());
                 text.width(bg.width() - 20);
@@ -1078,7 +1080,7 @@
             }
 
             if (currentCanvas === role) {
-              stage.getLayers().forEach(layer => {
+              stage.getLayers().forEach(function(layer) {
                 if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
               });
               stage.add(canvases[role]);
@@ -1089,33 +1091,8 @@
             await saveBoard();
           });
 
-          document.getElementById('export-pdf').addEventListener('click', () => {
-            if (contextTarget && contextTarget.name() === 'pdf') {
-              const { jsPDF } = window.jspdf;
-              const doc = new jsPDF();
-              const text = contextTarget.findOne('Text').text();
-              const children = contextTarget.find('.task').map(task => ({
-                title: task.find('.Text')[0].text(),
-                desc: task.find('.Text')[1].text(),
-                status: task.find('.Text')[2].text(),
-              }));
-
-              doc.text('PDF Content:', 10, 10);
-              doc.text(text, 10, 20);
-              if (children.length) {
-                doc.text('Tasks:', 10, 40);
-                children.forEach((child, i) => {
-                  doc.text(`${i + 1}. ${child.title} (${child.status})`, 10, 50 + i * 20);
-                  doc.text(`   ${child.desc}`, 10, 60 + i * 20);
-                });
-              }
-              doc.save('canvas_pdf.pdf');
-              contextMenu.classList.add('hidden');
-            }
-          });
-
           let editingNote = null;
-          document.getElementById('create-note').addEventListener('click', () => {
+          document.getElementById('create-note').addEventListener('click', function() {
             contextMenu.classList.add('hidden');
             document.getElementById('note-modal').classList.remove('hidden');
             document.getElementById('note-title').value = '';
@@ -1123,13 +1100,13 @@
             editingNote = null;
           });
 
-          document.getElementById('cancel-note').addEventListener('click', () => {
+          document.getElementById('cancel-note').addEventListener('click', function() {
             document.getElementById('note-modal').classList.add('hidden');
             document.getElementById('note-title').value = '';
             document.getElementById('note-content').value = '';
           });
 
-          document.getElementById('save-note').addEventListener('click', async () => {
+          document.getElementById('save-note').addEventListener('click', async function() {
             const title = document.getElementById('note-title').value.trim();
             const content = document.getElementById('note-content').value.trim();
             const role = document.getElementById('task-role').value || 'Общий';
@@ -1211,7 +1188,7 @@
               noteGroup.add(bg, titleText, contentText);
               canvases[role].add(noteGroup);
 
-              noteGroup.on('dblclick', () => {
+              noteGroup.on('dblclick', function() {
                 const textNodes = noteGroup.find('.Text');
                 if (textNodes.length < 2) {
                   console.error('Invalid note:', noteGroup.id(), textNodes.length);
@@ -1225,7 +1202,7 @@
                 document.getElementById('task-role').value = role;
               });
 
-              noteGroup.on('transform', () => {
+              noteGroup.on('transform', function() {
                 bg.width(noteGroup.width() / noteGroup.scaleX());
                 bg.height(noteGroup.height() / noteGroup.scaleY());
                 titleText.width(bg.width() - 20);
@@ -1235,7 +1212,7 @@
             }
 
             if (currentCanvas === role) {
-              stage.getLayers().forEach(layer => {
+              stage.getLayers().forEach(function(layer) {
                 if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
               });
               stage.add(canvases[role]);
@@ -1248,7 +1225,7 @@
           });
 
           let editingComment = null;
-          document.getElementById('create-comment').addEventListener('click', () => {
+          document.getElementById('create-comment').addEventListener('click', function() {
             contextMenu.classList.add('hidden');
             document.getElementById('comment-modal').classList.remove('hidden');
             document.getElementById('comment-author').value = currentUser.displayName || currentUser.email || 'Пользователь';
@@ -1256,13 +1233,13 @@
             editingComment = null;
           });
 
-          document.getElementById('cancel-comment').addEventListener('click', () => {
+          document.getElementById('cancel-comment').addEventListener('click', function() {
             document.getElementById('comment-modal').classList.add('hidden');
             document.getElementById('comment-author').value = '';
             document.getElementById('comment-content').value = '';
           });
 
-          document.getElementById('save-comment').addEventListener('click', async () => {
+          document.getElementById('save-comment').addEventListener('click', async function() {
             const author = document.getElementById('comment-author').value.trim();
             const content = document.getElementById('comment-content').value.trim();
             const role = document.getElementById('task-role').value || 'Общий';
@@ -1345,7 +1322,7 @@
               commentGroup.add(bg, authorText, contentText);
               canvases[role].add(commentGroup);
 
-              commentGroup.on('dblclick', () => {
+              commentGroup.on('dblclick', function() {
                 const textNodes = commentGroup.find('.Text');
                 if (textNodes.length < 2) {
                   console.error('Invalid comment:', commentGroup.id(), textNodes.length);
@@ -1359,7 +1336,7 @@
                 document.getElementById('task-role').value = role;
               });
 
-              commentGroup.on('transform', () => {
+              commentGroup.on('transform', function() {
                 bg.width(commentGroup.width() / commentGroup.scaleX());
                 bg.height(commentGroup.height() / commentGroup.scaleY());
                 authorText.width(bg.width() - 20);
@@ -1369,7 +1346,7 @@
             }
 
             if (currentCanvas === role) {
-              stage.getLayers().forEach(layer => {
+              stage.getLayers().forEach(function(layer) {
                 if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
               });
               stage.add(canvases[role]);
@@ -1382,19 +1359,19 @@
           });
 
           let editingText = null;
-          document.getElementById('create-text').addEventListener('click', () => {
+          document.getElementById('create-text').addEventListener('click', function() {
             contextMenu.classList.add('hidden');
             document.getElementById('text-modal').classList.remove('hidden');
             document.getElementById('text-content').value = '';
             editingText = null;
           });
 
-          document.getElementById('cancel-text').addEventListener('click', () => {
+          document.getElementById('cancel-text').addEventListener('click', function() {
             document.getElementById('text-modal').classList.add('hidden');
             document.getElementById('text-content').value = '';
           });
 
-          document.getElementById('save-text').addEventListener('click', async () => {
+          document.getElementById('save-text').addEventListener('click', async function() {
             const content = document.getElementById('text-content').value.trim();
             const role = document.getElementById('task-role').value || 'Общий';
 
@@ -1452,7 +1429,7 @@
               textGroup.add(bg, contentText);
               canvases[role].add(textGroup);
 
-              textGroup.on('dblclick', () => {
+              textGroup.on('dblclick', function() {
                 const textNodes = textGroup.find('.Text');
                 if (textNodes.length < 1) {
                   console.error('Invalid text:', textGroup.id(), textNodes.length);
@@ -1465,7 +1442,7 @@
                 document.getElementById('task-role').value = role;
               });
 
-              textGroup.on('transform', () => {
+              textGroup.on('transform', function() {
                 bg.width(textGroup.width() / textGroup.scaleX());
                 bg.height(textGroup.height() / textGroup.scaleY());
                 contentText.width(bg.width() - 20);
@@ -1474,7 +1451,7 @@
             }
 
             if (currentCanvas === role) {
-              stage.getLayers().forEach(layer => {
+              stage.getLayers().forEach(function(layer) {
                 if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
               });
               stage.add(canvases[role]);
@@ -1485,7 +1462,7 @@
             await saveBoard();
           });
 
-          document.getElementById('delete-element').addEventListener('click', async () => {
+          document.getElementById('delete-element').addEventListener('click', async function() {
             if (contextTarget) {
               const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
               const isOwner = boardDoc.data().owner === currentUser.uid;
@@ -1507,7 +1484,7 @@
           });
 
           const adminPanel = document.getElementById('admin-panel');
-          document.getElementById('toggle-admin').addEventListener('click', () => {
+          document.getElementById('toggle-admin').addEventListener('click', function() {
             const isHidden = adminPanel.classList.contains('hidden');
             adminPanel.classList.toggle('hidden');
             if (isHidden) {
@@ -1518,13 +1495,13 @@
             sidebar.classList.remove('open', 'slide-in');
           });
 
-          document.getElementById('generate-link').addEventListener('click', () => {
+          document.getElementById('generate-link').addEventListener('click', function() {
             const link = `https://app.example.com/invite/${currentBoardId}`;
             document.getElementById('invite-link').value = link;
             console.log('Generated invite link:', link);
           });
 
-          document.getElementById('add-role').addEventListener('click', async () => {
+          document.getElementById('add-role').addEventListener('click', async function() {
             const roleInput = document.getElementById('role-input').value.trim();
             const userUid = document.getElementById('user-select').value;
 
@@ -1551,7 +1528,7 @@
           });
 
           let scale = 1;
-          stage.on('wheel', e => {
+          stage.on('wheel', function(e) {
             e.evt.preventDefault();
             const oldScale = scale;
             const pointer = stage.getPointerPosition();
@@ -1576,7 +1553,7 @@
 
           let lastDist = 0;
           let startPos = { x: 0, y: 0 };
-          stage.on('touchstart', e => {
+          stage.on('touchstart', function(e) {
             if (e.evt.touches.length === 2) {
               lastDist = Math.hypot(
                 e.evt.touches[0].clientX - e.evt.touches[1].clientX,
@@ -1587,7 +1564,7 @@
             }
           });
 
-          stage.on('touchmove', e => {
+          stage.on('touchmove', function(e) {
             if (e.evt.touches.length === 2) {
               const newDist = Math.hypot(
                 e.evt.touches[0].clientX - e.evt.touches[1].clientX,
@@ -1627,11 +1604,11 @@
             }
           });
 
-          stage.on('touchend', () => {
+          stage.on('touchend', function() {
             lastDist = 0;
           });
 
-          window.addEventListener('resize', () => {
+          window.addEventListener('resize', function() {
             stage.width(window.innerWidth - (window.innerWidth <= 768 ? 0 : 256));
             stage.height(window.innerHeight);
             updateGrid();
