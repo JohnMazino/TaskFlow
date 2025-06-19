@@ -25,19 +25,19 @@
     .slide-out { animation: slide-out 0.3s ease-out forwards; }
     .fade-in { animation: fade-in 0.3s ease-out; }
     .card-hover:hover { transform: scale(1.02); transition: transform 0.2s ease; }
-    body.light { background-color: #f3f4f6; color: #1f2937; }
-    body.light .bg-gray-800 { background-color: #ffffff; }
-    body.light .bg-gray-700 { background-color: #e5e7eb; }
+    body { background-color: #1f2937; color: #ffffff; }
     #admin-panel, #auth-modal, #board-modal { z-index: 30; }
     #canvas-container { position: relative; overflow: hidden; }
     @media (max-width: 768px) {
-      #sidebar { width: 100%; height: 100%; position: fixed; top: 0; left: -100%; transition: transform 0.3s ease; z-index: 40; }
+      #sidebar { width: 80%; height: 100%; position: fixed; top: 0; left: -80%; transition: transform 0.3s ease; z-index: 40; }
       #sidebar.open { transform: translateX(0); }
-      #admin-panel { width: 100%; transform: translateX(100%); transition: transform 0.3s ease; }
+      #admin-panel { width: 80%; transform: translateX(100%); transition: transform 0.3s ease; }
       #admin-panel.open { transform: translateX(0); }
       #canvas-container { width: 100%; }
       .modal-content { width: 90%; max-width: 400px; }
       #hamburger-menu { display: block; }
+      #context-menu { width: 150px; font-size: 14px; }
+      input, textarea, select { font-size: 14px; }
     }
     @media (min-width: 769px) {
       #sidebar { width: 256px; position: static; transform: none; }
@@ -46,7 +46,7 @@
     }
   </style>
 </head>
-<body class="bg-gray-900 text-white flex h-screen overflow-hidden">
+<body class="flex h-screen overflow-hidden">
   <!-- Кнопка-гамбургер -->
   <button id="hamburger-menu" class="fixed top-4 left-4 z-50 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 md:hidden">
     ☰
@@ -78,22 +78,11 @@
         </select>
         <button id="add-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Добавить</button>
       </div>
-      <div>
-        <label class="block text-sm font-medium">Тема интерфейса</label>
-        <select id="theme-select" class="w-full bg-gray-700 p-2 rounded">
-          <option value="dark">Тёмная</option>
-          <option value="light">Светлая</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium">Экспорт доски</label>
-        <button id="export-board" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Экспортировать в PDF</button>
-      </div>
     </div>
   </div>
 
   <!-- Модальное окно аутентификации -->
-  <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
+  <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30">
     <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
       <h3 id="auth-title" class="text-lg font-bold mb-4">Вход в приложение</h3>
       <div id="auth-form" class="space-y-4">
@@ -123,17 +112,22 @@
   <div id="board-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
     <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
       <h3 class="text-lg font-bold mb-4">Управление досками</h3>
-      <button id="create-board" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2">Создать новую доску</button>
-      <div class="mt-4">
+      <div class="mb-4">
+        <label class="block text-sm font-medium">Название новой доски</label>
+        <input id="board-name-input" type="text" placeholder="Введите название" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <button id="create-board" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full">Создать</button>
+      </div>
+      <div class="mb-4">
         <label class="block text-sm font-medium">Присоединиться по ссылке</label>
         <input id="join-link" type="text" placeholder="Вставьте ссылку" class="w-full bg-gray-700 p-2 rounded mb-2">
         <button id="join-board" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full">Присоединиться</button>
       </div>
+      <button id="back-to-boards" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 w-full">Вернуться к доскам</button>
     </div>
   </div>
 
   <!-- Холст -->
-  <div id="canvas-container" class="flex-1 bg-gray-700 relative"></div>
+  <div id="canvas-container" class="flex-1 bg-gray-700 relative hidden"></div>
 
   <!-- Контекстное меню -->
   <div id="context-menu" class="hidden absolute bg-gray-800 text-white rounded shadow-lg p-2 z-20">
@@ -172,6 +166,9 @@
     <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать PDF</h3>
       <textarea id="pdf-content" placeholder="Содержимое PDF" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <select id="task-role" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="">Выберите роль</option>
+      </select>
       <div class="flex justify-end space-x-2">
         <button id="cancel-pdf" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
         <button id="save-pdf" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
@@ -185,6 +182,9 @@
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать заметку</h3>
       <input id="note-title" type="text" placeholder="Заголовок заметки" class="w-full bg-gray-700 p-2 rounded mb-2">
       <textarea id="note-content" placeholder="Содержимое заметки" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <select id="task-role" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="">Выберите роль</option>
+      </select>
       <div class="flex justify-end space-x-2">
         <button id="cancel-note" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
         <button id="save-note" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
@@ -198,6 +198,9 @@
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать комментарий</h3>
       <input id="comment-author" type="text" placeholder="Автор" class="w-full bg-gray-700 p-2 rounded mb-2">
       <textarea id="comment-content" placeholder="Текст комментария" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <select id="task-role" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="">Выберите роль</option>
+      </select>
       <div class="flex justify-end space-x-2">
         <button id="cancel-comment" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
         <button id="save-comment" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
@@ -210,8 +213,11 @@
     <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать текст</h3>
       <textarea id="text-content" placeholder="Введите текст" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <select id="task-role" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <option value="">Выберите роль</option>
+      </select>
       <div class="flex justify-end space-x-2">
-        <button id="cancel-text" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-blue-700">Отмена</button>
+        <button id="cancel-text" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
         <button id="save-text" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
       </div>
     </div>
@@ -220,7 +226,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
-    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, query, where, getDocs, arrayUnion, getDocFromCache } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, query, where, getDocs, arrayUnion, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAdPjUWf2gkcZxOAkQb-3hkjKtuETOVRhc",
@@ -238,6 +244,7 @@
     let currentUser = null;
     let currentBoardId = null;
     let isSignInMode = true;
+    let unsubscribeBoardSnapshot = null;
 
     window.onload = async () => {
       console.log('DOM loaded, initializing app...');
@@ -315,6 +322,7 @@
             document.getElementById('board-modal').classList.add('hidden');
             document.getElementById('canvas-container').classList.add('hidden');
             sidebar.classList.add('hidden');
+            if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
             console.log('No user signed in');
           }
         });
@@ -336,6 +344,7 @@
             console.log('User signed out');
             currentBoardId = null;
             sidebar.classList.remove('open');
+            if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
           } catch (error) {
             console.error('Error signing out:', error);
           }
@@ -343,23 +352,28 @@
 
         hamburgerMenu.addEventListener('click', () => {
           if (sidebar.classList.contains('open')) {
-            sidebar.classList.remove('open');
+            sidebar.classList.remove('open', 'slide-in');
             sidebar.classList.add('slide-out');
             setTimeout(() => sidebar.classList.remove('slide-out'), 300);
           } else {
             sidebar.classList.add('open', 'slide-in');
+            document.getElementById('admin-panel').classList.remove('open', 'slide-in');
           }
-          document.getElementById('admin-panel').classList.remove('open');
         });
 
         document.getElementById('create-board').addEventListener('click', async () => {
+          const boardName = document.getElementById('board-name-input').value.trim();
+          if (!boardName) {
+            alert('Введите название доски');
+            return;
+          }
           try {
             if (!currentUser) throw new Error('Пользователь не аутентифицирован');
             const boardRef = await addDoc(collection(db, 'boards'), {
-              name: `Доска ${new Date().toLocaleString('ru-RU')}`,
+              name: boardName,
               owner: currentUser.uid,
               users: [currentUser.uid],
-              roleAssignments: {}, // Хранит пары { роль: uid }
+              roleAssignments: {},
               canvases: { 'Общий': [] }
             });
             currentBoardId = boardRef.id;
@@ -398,6 +412,15 @@
           }
         });
 
+        document.getElementById('back-to-boards').addEventListener('click', () => {
+          document.getElementById('canvas-container').classList.add('hidden');
+          document.getElementById('sidebar').classList.add('hidden');
+          document.getElementById('board-modal').classList.remove('hidden');
+          if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
+          currentBoardId = null;
+          loadUserBoards();
+        });
+
         async function loadUserBoards() {
           try {
             const boardsList = document.getElementById('boards-list');
@@ -433,10 +456,10 @@
           if (boardDoc.exists()) {
             const users = boardDoc.data().users || [];
             for (const uid of users) {
-              const userDoc = await getDoc(doc(db, 'users', uid));
+              const user = await auth.getUser(uid).catch(() => null);
               const option = document.createElement('option');
               option.value = uid;
-              option.textContent = userDoc.exists() ? userDoc.data().email || 'Пользователь' : uid;
+              option.textContent = user ? (user.displayName || user.email || uid) : uid;
               userSelect.appendChild(option);
             }
           }
@@ -444,6 +467,7 @@
 
         let stage, backgroundLayer, transformerLayer, transformer, canvases, currentCanvas, roleAssignments;
         async function initBoard() {
+          if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
           stage = new Konva.Stage({
             container: 'canvas-container',
             width: window.innerWidth - (window.innerWidth <= 768 ? 0 : 256),
@@ -516,6 +540,35 @@
           if (isOwner) loadBoardUsers();
           updateRolesList();
 
+          unsubscribeBoardSnapshot = onSnapshot(doc(db, 'boards', currentBoardId), (doc) => {
+            if (!doc.exists()) return;
+            const data = doc.data();
+            roleAssignments = data.roleAssignments || {};
+            Object.keys(canvases).forEach(role => {
+              if (!data.canvases[role]) {
+                canvases[role].destroy();
+                delete canvases[role];
+              }
+            });
+            Object.keys(data.canvases || {}).forEach(role => {
+              if (!canvases[role]) canvases[role] = new Konva.Layer();
+              canvases[role].destroyChildren();
+              data.canvases[role].forEach(item => {
+                const group = createGroupFromData(item);
+                canvases[role].add(group);
+              });
+              if (role === currentCanvas) {
+                stage.getLayers().forEach(layer => {
+                  if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
+                });
+                stage.add(canvases[role]);
+                stage.batchDraw();
+              }
+            });
+            updateRolesList();
+            console.log('Board updated in real-time:', currentBoardId);
+          });
+
           function createGroupFromData(data) {
             const group = new Konva.Group({
               x: data.x,
@@ -577,7 +630,7 @@
               group.on('dblclick', () => {
                 editingComment = group;
                 document.getElementById('comment-modal').classList.remove('hidden');
-                document.getElementById('comment-author').value = data.texts.author.text.replace(/ \(.*\)/, '');
+                document.getElementById('comment-author').value = textNodes[0].text().replace(/ \(.*\)/, '');
                 document.getElementById('comment-content').value = textNodes[1].text();
                 document.getElementById('task-role').value = data.role;
               });
@@ -598,10 +651,12 @@
               textNodes.forEach(text => text.width(bg.width() - 20));
               if (data.type === 'task') textNodes[2].y(bg.height() - 30);
             });
+            group.on('dragend', saveBoard);
             return group;
           }
 
           function updateRolesList() {
+            const rolesList = document.getElementById('roles-list');
             rolesList.innerHTML = '';
             const allCanvases = ['Общий', ...Object.keys(roleAssignments)];
             allCanvases.forEach(role => {
@@ -689,14 +744,15 @@
           const contextMenu = document.getElementById('context-menu');
           let contextTarget = null;
           let contextPos = { x: 0, y: 0 };
-          stage.on('contextmenu', e => {
+          stage.on('contextmenu touchend', e => {
+            if (e.evt.type === 'touchend' && e.evt.touches && e.evt.touches.length > 1) return;
             e.evt.preventDefault();
             contextPos = stage.getPointerPosition();
             const intersection = stage.getIntersection(contextPos);
             contextTarget = null;
 
-            const boardDoc = getDocFromCache(doc(db, 'boards', currentBoardId));
-            const isOwner = boardDoc?.data()?.owner === currentUser.uid;
+            const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+            const isOwner = boardDoc.data().owner === currentUser.uid;
             const assignedUser = roleAssignments[currentCanvas];
 
             if (currentCanvas !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
@@ -719,10 +775,12 @@
             document.getElementById('delete-element').classList.toggle('hidden', !contextTarget);
             document.getElementById('export-pdf').classList.toggle('hidden', !contextTarget || contextTarget.name() !== 'pdf');
 
-            contextMenu.style.left = `${e.evt.clientX}px`;
-            contextMenu.style.top = `${e.evt.clientY}px`;
+            const clientX = e.evt.clientX || (e.evt.touches && e.evt.touches[0]?.clientX) || 0;
+            const clientY = e.evt.clientY || (e.evt.touches && e.evt.touches[0]?.clientY) || 0;
+            contextMenu.style.left = `${clientX}px`;
+            contextMenu.style.top = `${clientY}px`;
             contextMenu.classList.remove('hidden');
-            console.log('Opened context menu at:', e.evt.clientX, e.evt.clientY, 'target:', contextTarget ? contextTarget.name() : 'none');
+            console.log('Opened context menu at:', clientX, clientY, 'target:', contextTarget ? contextTarget.name() : 'none');
           });
 
           document.addEventListener('click', e => {
@@ -732,7 +790,14 @@
             }
           });
 
-          stage.on('click', e => {
+          document.addEventListener('touchstart', e => {
+            if (!contextMenu.contains(e.target) && e.touches.length === 1) {
+              contextMenu.classList.add('hidden');
+              contextTarget = null;
+            }
+          });
+
+          stage.on('click tap', e => {
             const pos = stage.getPointerPosition();
             const intersection = stage.getIntersection(pos);
             if (!intersection || intersection.getLayer() === backgroundLayer) {
@@ -884,6 +949,7 @@
                 statusText.width(bg.width() - 20);
                 statusText.y(bg.height() - 30);
               });
+              card.on('dragend', saveBoard);
             }
 
             if (currentCanvas === role) {
@@ -1004,7 +1070,6 @@
               });
 
               pdfGroup.on('dragend', handlePdfDragEnd);
-
               pdfGroup.on('transform', () => {
                 bg.width(pdfGroup.width() / pdfGroup.scaleX());
                 bg.height(pdfGroup.height() / pdfGroup.scaleY());
@@ -1047,39 +1112,6 @@
               doc.save('canvas_pdf.pdf');
               contextMenu.classList.add('hidden');
             }
-          });
-
-          document.getElementById('export-board').addEventListener('click', async () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            let yOffset = 10;
-            Object.keys(canvases).forEach(role => {
-              doc.text(`Роль: ${role}`, 10, yOffset);
-              yOffset += 10;
-              canvases[role].find('.Group').forEach(group => {
-                const texts = group.find('.Text').map(text => text.text());
-                doc.text(`${group.name()}:`, 10, yOffset);
-                yOffset += 10;
-                texts.forEach(text => {
-                  doc.text(text, 15, yOffset);
-                  yOffset += 10;
-                });
-                if (group.name() === 'pdf') {
-                  group.find('.task').forEach(task => {
-                    const taskTexts = task.find('.Text').map(t => t.text());
-                    doc.text('Задача в PDF:', 15, yOffset);
-                    yOffset += 10;
-                    taskTexts.forEach(t => {
-                      doc.text(t, 20, yOffset);
-                      yOffset += 10;
-                    });
-                  });
-                }
-                yOffset += 10;
-              });
-            });
-            doc.save(`board_${currentBoardId}.pdf`);
-            console.log('Exported board:', currentBoardId);
           });
 
           let editingNote = null;
@@ -1199,6 +1231,7 @@
                 titleText.width(bg.width() - 20);
                 contentText.width(bg.width() - 20);
               });
+              noteGroup.on('dragend', saveBoard);
             }
 
             if (currentCanvas === role) {
@@ -1332,6 +1365,7 @@
                 authorText.width(bg.width() - 20);
                 contentText.width(bg.width() - 20);
               });
+              commentGroup.on('dragend', saveBoard);
             }
 
             if (currentCanvas === role) {
@@ -1436,6 +1470,7 @@
                 bg.height(textGroup.height() / textGroup.scaleY());
                 contentText.width(bg.width() - 20);
               });
+              textGroup.on('dragend', saveBoard);
             }
 
             if (currentCanvas === role) {
@@ -1480,7 +1515,7 @@
             } else {
               adminPanel.classList.remove('slide-in', 'open');
             }
-            sidebar.classList.remove('open');
+            sidebar.classList.remove('open', 'slide-in');
           });
 
           document.getElementById('generate-link').addEventListener('click', () => {
@@ -1515,11 +1550,6 @@
             console.log('Added role:', roleInput, 'assigned to:', userUid);
           });
 
-          document.getElementById('theme-select').addEventListener('change', e => {
-            document.body.className = e.target.value === 'light' ? 'bg-gray-100 text-black light' : 'bg-gray-900 text-white';
-            console.log('Switched theme to:', e.target.value);
-          });
-
           let scale = 1;
           stage.on('wheel', e => {
             e.evt.preventDefault();
@@ -1552,7 +1582,7 @@
                 e.evt.touches[0].clientX - e.evt.touches[1].clientX,
                 e.evt.touches[0].clientY - e.evt.touches[1].clientY
               );
-            } else if (e.evt.ctrlKey || e.evt.touches.length === 1) {
+            } else if (e.evt.touches.length === 1) {
               startPos = stage.getPointerPosition();
             }
           });
@@ -1585,7 +1615,7 @@
                 updateGrid();
                 stage.batchDraw();
               }
-            } else if (e.evt.ctrlKey || e.evt.touches.length === 1) {
+            } else if (e.evt.touches.length === 1) {
               const pos = stage.getPointerPosition();
               stage.position({
                 x: stage.x() + pos.x - startPos.x,
