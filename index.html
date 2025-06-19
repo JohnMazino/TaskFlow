@@ -8,9 +8,10 @@
   <script src="https://unpkg.com/konva@8.3.5/konva.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
   <style>
     @keyframes slide-in {
       from { transform: translateX(100%); opacity: 0; }
@@ -26,175 +27,172 @@
     body.light { background-color: #f3f4f6; color: #1f2937; }
     body.light .bg-gray-800 { background-color: #ffffff; }
     body.light .bg-gray-700 { background-color: #e5e7eb; }
-    #admin-panel, #auth-panel, #board-panel { z-index: 1000; }
-    #canvas-container { position: relative; overflow: hidden; width: 100%; height: 100%; }
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
-    .modal-content { background: #1a202c; padding: 4px; border-radius: 8px; width: 90%; max-width: 400px; }
-    .cursor-icon { font-size: 12px; font-family: Arial; fill: white; }
-    @media (max-width: 600px) {
-      #sidebar { width: 100%; height: 100%; position: fixed; top: 0; left: 0; transform: translateX(-100%); transition: transform 0.3s ease; z-index: 1500; }
-      #sidebar.active { transform: translateX(0); }
-      #menu-btn { display: block; position: fixed; top: 4px; left: 4px; z-index: 1600; }
-      #canvas-container { width: 100%; height: calc(100vh - 48px); }
-      .modal-content { width: 95%; padding: 10px; }
-      #admin-panel { width: 100%; height: 100%; position: fixed; top: 0; right: 0; }
+    #admin-panel, #auth-modal, #board-modal { z-index: 30; }
+    #canvas-container { position: relative; overflow: hidden; }
+    /* Адаптивная верстка */
+    @media (max-width: 768px) {
+      #sidebar { width: 100%; height: 100%; position: fixed; top: 0; left: -100%; transition: left 0.3s ease; }
+      #sidebar.open { left: 0; }
+      #admin-panel { width: 100%; right: -100%; transition: right 0.3s ease; }
+      #admin-panel.open { right: 0; }
+      #canvas-container { width: 100%; }
+      .modal-content { width: 90%; max-width: 400px; }
+      #hamburger-menu { display: block; }
+    }
+    @media (min-width: 769px) {
+      #sidebar { width: 256px; position: static; }
+      #admin-panel { width: 320px; }
+      #hamburger-menu { display: none; }
     }
   </style>
 </head>
-<body class="min-h-screen bg-gray-900 text-white overflow-hidden">
-  <!-- Menu Button (Mobile) -->
-  <button id="menu-btn" class="fixed top-4 left-4 z-50 p-2 bg-blue-600 text-white hidden sm:block rounded-md hover:bg-blue-700">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
+<body class="bg-gray-900 text-white flex h-screen overflow-hidden">
+  <!-- Кнопка-гамбургер для мобильных -->
+  <button id="hamburger-menu" class="fixed top-4 left-4 z-40 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 md:hidden">
+    ☰
   </button>
 
-  <!-- Auth Panel -->
-  <div id="auth-panel" class="flex flex-col items-center justify-center min-h-screen w-full bg-gray-800 p-4">
-    <div class="text-center mb-6">
-      <h2 class="text-2xl font-bold sm:text-3xl">Вход или регистрация</h2>
-    </div>
-    <div class="bg-gray-800 p-4 rounded-lg w-full max-w-md">
-      <div id="email-auth">
-        <input id="display-name" type="text" placeholder="Ваше имя" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-        <input id="email" type="email" placeholder="Email" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-        <input id="password" type="password" placeholder="Пароль" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-        <button id="login-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2 text-sm sm:text-base">Войти</button>
-        <button id="register-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full text-sm sm:text-base">Зарегистрироваться</button>
-      </div>
-      <div class="mt-4 text-center">
-        <button id="google-login-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 w-full text-sm sm:text-base">Войти через Google</button>
-      </div>
-    </div>
+  <!-- Боковая панель -->
+  <div id="sidebar" class="w-64 bg-gray-800 p-4 flex flex-col slide-in">
+    <h2 class="text-xl font-bold mb-4">Доски и роли</h2>
+    <div id="boards-list" class="mb-4"></div>
+    <ul id="roles-list" class="space-y-2 flex-1"></ul>
+    <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Админ-панель</button>
+    <button id="logout" class="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">Выйти</button>
   </div>
 
-  <!-- Board Selection Panel -->
-  <div id="board-panel" style="display: none;" class="flex flex-col items-center justify-center min-h-screen w-full bg-gray-800 p-4">
-    <div class="bg-gray-800 p-4 rounded-lg w-full max-w-md">
-      <h3 class="text-lg font-bold mb-4 sm:text-xl">Выберите действие</h3>
-      <button id="create-board-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2 text-sm sm:text-base">Создать новую доску</button>
-      <input id="join-link" type="text" placeholder="Вставьте ссылку-приглашение" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-      <button id="join-board-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full text-sm:text-base">Присоединиться к доске</button>
-      <button id="export-boards-btn" class="bg-purple-600 text-white px-4 py-2:bg-purple-700 w-full mt-2 text-sm sm:text-base">Экспортировать доски</button>
-      <input id="import-boards" type="file" accept=".json" class="w-full bg-gray-700 p-2 rounded mt-2 text-sm sm:text-base">
-    </div>
-  </div>
-
-  <!-- Sidebar -->
-  <div id="sidebar" style="display: none;" class="w-full bg-gray-800 p-4 flex flex-col sm:w-64 min-h-screen sm:min-h-screen slide-in">
-    <h2 class="text-lg font-semibold mb-4 sm:text-xl">Роли и холсты</h2>
-    <ul id="roles-list" class="space-y-2"></ul>
-    <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition text-sm sm:text-base">Админ-панель</button>
-    <button id="logout-btn" class="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition text-sm sm:text-base">Выйти</button>
-  </div>
-
-  <!-- Admin Panel -->
-  <div id="admin-panel" style="display: none;" class="w-full bg-gray-800 p-4 absolute right-0 top-0 h-full sm:w-80 sm:h-full">
-    <h2 class="text-lg font-semibold mb-4 sm:text-xl">Админ-панель</h2>
+  <!-- Админ-панель -->
+  <div id="admin-panel" class="hidden w-80 bg-gray-800 p-4 absolute right-0 top-0 h-full">
+    <h2 class="text-xl font-bold mb-4">Админ-панель</h2>
     <div class="space-y-4">
       <div>
         <label class="block text-sm font-medium">Приглашение по ссылке</label>
-        <input id="invite-link" type="text" readonly="readonly" class="w-full bg-gray-700 p-2 rounded text-sm sm:text-sm">
-        <button id="generate-link" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2 w-full text-sm sm:text-base">Сгенерировать ссылку</button>
+        <input id="invite-link" type="text" readonly class="w-full bg-gray-700 p-2 rounded">
+        <button id="generate-link" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Сгенерировать ссылку</button>
       </div>
       <div>
         <label class="block text-sm font-medium">Добавить роль</label>
-        <input id="role-input" type="text" placeholder="Введите роль" class="w-full bg-gray-700 p-2 rounded text-sm sm:text-sm">
-        <button id="add-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2 w-full text-sm sm:text-base">Добавить</button>
-      </div>
-      <div>
-        <label class="block text-sm font-medium">Назначить роль</label>
-        <select id="member-select" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-sm"></select>
-        <select id="role-select" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-sm"></select>
-        <button id="assign-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full text-sm sm:text-base">Назначить</button>
+        <input id="role-input" type="text" placeholder="Введите роль" class="w-full bg-gray-700 p-2 rounded">
+        <button id="add-role" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Добавить</button>
       </div>
       <div>
         <label class="block text-sm font-medium">Тема интерфейса</label>
-        <select id="theme-select" class="w-full bg-gray-700 p-2 rounded text-sm sm:text-sm">
+        <select id="theme-select" class="w-full bg-gray-700 p-2 rounded">
           <option value="dark">Тёмная</option>
           <option value="light">Светлая</option>
         </select>
       </div>
+      <div>
+        <label class="block text-sm font-medium">Экспорт доски</label>
+        <button id="export-board" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Экспортировать в PDF</button>
+      </div>
     </div>
   </div>
 
-  <!-- Canvas -->
-  <div id="canvas-container" style="display: none;" class="flex-1 bg-gray-700 relative"></div>
-
-  <!-- Context Menu -->
-  <div id="context-menu" style="display: none;" class="absolute bg-gray-800 text-white rounded shadow-lg p-2 z-10">
-    <button id="create-task" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать задачу</button>
-    <button id="create-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать PDF</button>
-    <button id="create-note" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать заметку</button>
-    <button id="create-comment" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать комментарий</button>
-    <button id="create-text" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Создать текст</button>
-    <button id="delete-element" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Удалить</button>
-    <button id="export-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left text-sm sm:text-base">Экспортировать в PDF</button>
+  <!-- Модальное окно аутентификации -->
+  <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
+    <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
+      <h3 class="text-lg font-bold mb-4">Вход в приложение</h3>
+      <button id="google-signin" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full flex items-center justify-center">
+        <img src="https://www.google.com/favicon.ico" class="w-5 h-5 mr-2" alt="Google"> Войти через Google
+      </button>
+    </div>
   </div>
 
-  <!-- Modals -->
-  <div id="task-modal" class="modal-overlay">
-    <div class="modal-content">
+  <!-- Модальное окно выбора доски -->
+  <div id="board-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
+    <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
+      <h3 class="text-lg font-bold mb-4">Управление досками</h3>
+      <button id="create-board" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full mb-2">Создать новую доску</button>
+      <div class="mt-4">
+        <label class="block text-sm font-medium">Присоединиться по ссылке</label>
+        <input id="join-link" type="text" placeholder="Вставьте ссылку" class="w-full bg-gray-700 p-2 rounded mb-2">
+        <button id="join-board" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full">Присоединиться</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Холст -->
+  <div id="canvas-container" class="flex-1 bg-gray-700 relative"></div>
+
+  <!-- Контекстное меню -->
+  <div id="context-menu" class="hidden absolute bg-gray-800 text-white rounded shadow-lg p-2 z-20">
+    <button id="create-task" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать задачу</button>
+    <button id="create-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать PDF</button>
+    <button id="create-note" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать заметку</button>
+    <button id="create-comment" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать комментарий</button>
+    <button id="create-text" class="block px-4 py-2 hover:bg-gray-600 w-full text-left">Создать текст</button>
+    <button id="delete-element" class="block px-4 py-2 hover:bg-gray-600 w-full text-left hidden">Удалить</button>
+    <button id="export-pdf" class="block px-4 py-2 hover:bg-gray-600 w-full text-left hidden">Экспортировать PDF</button>
+  </div>
+
+  <!-- Модальное окно для задачи -->
+  <div id="task-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+    <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать задачу</h3>
-      <input id="task-title" type="text" placeholder="Заголовок задачи" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-      <textarea id="task-desc" placeholder="Описание задачи" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
-      <select id="task-status" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+      <input id="task-title" type="text" placeholder="Заголовок задачи" class="w-full bg-gray-700 p-2 rounded mb-2">
+      <textarea id="task-desc" placeholder="Описание задачи" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
+      <select id="task-status" class="w-full bg-gray-700 p-2 rounded mb-2">
         <option value="К выполнению">К выполнению</option>
         <option value="В процессе">В процессе</option>
         <option value="Завершено">Завершено</option>
       </select>
-      <select id="task-role" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
+      <select id="task-role" class="w-full bg-gray-700 p-2 rounded mb-2">
         <option value="">Выберите роль</option>
       </select>
       <div class="flex justify-end space-x-2">
-        <button id="cancel-task" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-task" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+        <button id="cancel-task" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
+        <button id="save-task" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
       </div>
     </div>
   </div>
 
-  <div id="pdf-modal" class="modal-overlay">
-    <div class="modal-content">
+  <!-- Модальное окно для PDF -->
+  <div id="pdf-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+    <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать PDF</h3>
-      <textarea id="pdf-content" placeholder="Содержимое PDF" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
+      <textarea id="pdf-content" placeholder="Содержимое PDF" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
       <div class="flex justify-end space-x-2">
-        <button id="cancel-pdf" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-pdf" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+        <button id="cancel-pdf" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
+        <button id="save-pdf" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
       </div>
     </div>
   </div>
 
-  <div id="note-modal" class="modal-overlay">
-    <div class="modal-content">
+  <!-- Модальное окно для заметки -->
+  <div id="note-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+    <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать заметку</h3>
-      <input id="note-title" type="text" placeholder="Заголовок заметки" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-      <textarea id="note-content" placeholder="Содержимое заметки" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
+      <input id="note-title" type="text" placeholder="Заголовок заметки" class="w-full bg-gray-700 p-2 rounded mb-2">
+      <textarea id="note-content" placeholder="Содержимое заметки" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
       <div class="flex justify-end space-x-2">
-        <button id="cancel-note" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-note" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+        <button id="cancel-note" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
+        <button id="save-note" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
       </div>
     </div>
   </div>
 
-  <div id="comment-modal" class="modal-overlay">
-    <div class="modal-content">
+  <!-- Модальное окно для комментария -->
+  <div id="comment-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+    <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать комментарий</h3>
-      <input id="comment-author" type="text" placeholder="Автор" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base">
-      <textarea id="comment-content" placeholder="Текст комментария" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
+      <input id="comment-author" type="text" placeholder="Автор" class="w-full bg-gray-700 p-2 rounded mb-2">
+      <textarea id="comment-content" placeholder="Текст комментария" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
       <div class="flex justify-end space-x-2">
-        <button id="cancel-comment" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-comment" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+        <button id="cancel-comment" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Отмена</button>
+        <button id="save-comment" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
       </div>
     </div>
   </div>
 
-  <div id="text-modal" class="modal-overlay">
-    <div class="modal-content">
+  <!-- Модальное окно для текста -->
+  <div id="text-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+    <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
       <h3 class="text-lg font-bold mb-4">Создать/Редактировать текст</h3>
-      <textarea id="text-content" placeholder="Введите текст" class="w-full bg-gray-700 p-2 rounded mb-2 text-sm sm:text-base"></textarea>
+      <textarea id="text-content" placeholder="Введите текст" class="w-full bg-gray-700 p-2 rounded mb-2"></textarea>
       <div class="flex justify-end space-x-2">
-        <button id="cancel-text" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm sm:text-base">Отмена</button>
-        <button id="save-text" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Сохранить</button>
+        <button id="cancel-text" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-blue-700">Отмена</button>
+        <button id="save-text" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Сохранить</button>
       </div>
     </div>
   </div>
@@ -202,1344 +200,1274 @@
   <script>
     // Firebase Config
     const firebaseConfig = {
-      apiKey: "AIzaSyDx9dHwNFuPMGSLFDJHgaH1vfE679ZPVD4",
-      authDomain: "miro-7014e.firebaseapp.com",
-      projectId: "miro-7014e",
-      storageBucket: "miro-7014e.firebasestorage.app",
-      messagingSenderId: "484715250794",
-      appId: "1:484715250794:web:51dac4a0311942176e3613",
-      measurementId: "G-GHCKM1FMLP"
+      apiKey: "AIzaSyAdPjUWf2gkcZxOAkQb-3hkjKtuETOVRhc",
+      authDomain: "tawn-71d42.firebaseapp.com",
+      projectId: "tawn-71d42",
+      storageBucket: "tawn-71d42.firebasestorage.app",
+      messagingSenderId: "1098831654973",
+      appId: "1:1098831654973:web:4bdc2fb530d7acb17afa54",
+      measurementId: "G-55XQ2KBXW9"
     };
 
-    // Initialize Firebase
+    // Инициализация Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-
-    // DOM Elements
-    const authPanel = document.getElementById('auth-panel');
-    const boardPanel = document.getElementById('board-panel');
-    const sidebar = document.getElementById('sidebar');
-    const canvasContainer = document.getElementById('canvas-container');
-    const rolesList = document.getElementById('roles-list');
-    const contextMenu = document.getElementById('context-menu');
-    const menuBtn = document.getElementById('menu-btn');
-
-    // State
     let currentUser = null;
     let currentBoardId = null;
-    let isAdmin = false;
-    let userRole = null;
-    let boardRoles = {};
-    let canvases = {};
-    let currentCanvas = 'Common';
-    let stage, backgroundLayer, transformerLayer, transformer, cursorLayer;
-    let cursors = {};
-    let lastCursorUpdate = 0;
-    let lastGridUpdate = 0;
 
-    // Debounce Utility
-    function debounce(func, wait) {
-      let timeout;
-      return function executedFunction(...args) {
-        const later = () => {
-          clearTimeout(timeout);
-          func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-      };
-    }
-
-    // Update Grid Function
-    function updateGrid(stage, backgroundLayer) {
-      const now = Date.now();
-      if (now - lastGridUpdate < 100) return;
-      lastGridUpdate = now;
-
+    window.onload = () => {
+      console.log('DOM loaded, initializing app...');
       try {
-        backgroundLayer.destroyChildren();
-        const scale = stage.scaleX();
-        if (scale < 0.5) return;
-        const stagePos = stage.position();
-        const visibleWidth = stage.width() / scale;
-        const visibleHeight = stage.height() / scale;
-        const gridSpacing = 50;
-        const startX = Math.floor((-stagePos.x / scale - visibleWidth / 2) / gridSpacing) * gridSpacing;
-        const startY = Math.floor((-stagePos.y / scale - visibleHeight / 2) / gridSpacing) * gridSpacing;
-        const endX = startX + visibleWidth;
-        const endY = startY + visibleHeight;
-
-        for (let y = startY; y < endY; y += gridSpacing) {
-          backgroundLayer.add(new Konva.Line({
-            points: [startX, y, endX, y],
-            stroke: 'rgba(255, 255, 255, 0.2)',
-            strokeWidth: 1 / scale,
-          }));
-        }
-        for (let x = startX; x < endX; x += gridSpacing) {
-          backgroundLayer.add(new Konva.Line({
-            points: [x, startY, x, endY],
-            stroke: 'rgba(255, 255, 255, 0.2)',
-            strokeWidth: 1 / scale,
-          }));
-        }
-        backgroundLayer.batchDraw();
-      } catch (error) {
-        console.error('Error updating grid:', error);
-      }
-    }
-
-    // Authentication
-    auth.onAuthStateChanged(user => {
-      try {
-        if (user) {
-          currentUser = user;
-          authPanel.style.display = 'none';
-          boardPanel.style.display = 'flex';
-          document.getElementById('comment-author').value = user.displayName || user.email;
-          console.log('User authenticated:', user.displayName || user.email);
-          const boardId = window.location.pathname.match(/\/join\/(.+)/)?.[1];
-          if (boardId) {
-            document.getElementById('join-link').value = `${window.location.origin}/join/${boardId}`;
-            boardPanel.style.display = 'flex';
-            history.replaceState(null, '', '/');
-          }
-        } else {
-          currentUser = null;
-          authPanel.style.display = 'flex';
-          boardPanel.style.display = 'none';
-          sidebar.style.display = 'none';
-          canvasContainer.style.display = 'none';
-          menuBtn.style.display = 'none';
-          console.log('User not authenticated');
-        }
-      } catch (error) {
-        console.error('Error handling auth state:', error);
-      }
-    });
-
-    // Login
-    document.getElementById('login-btn').addEventListener('click', async () => {
-      try {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        await auth.signInWithEmailAndPassword(email, password);
-        console.log('Logged in:', email);
-      } catch (err) {
-        console.error('Login error:', err);
-        alert(err.message);
-      }
-    });
-
-    // Register
-    document.getElementById('register-btn').addEventListener('click', async () => {
-      try {
-        const displayName = document.getElementById('display-name').value.trim();
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        await userCredential.user.updateProfile({ displayName });
-        console.log('Registered:', displayName || email);
-      } catch (err) {
-        console.error('Registration error:', err);
-        alert(err.message);
-      }
-    });
-
-    // Google Login
-    document.getElementById('google-login-btn').addEventListener('click', async () => {
-      try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        const result = await auth.signInWithPopup(provider);
-        console.log('Google login:', result.user.displayName || result.user.email);
-      } catch (err) {
-        console.error('Google login error:', err);
-        alert(err.message);
-      }
-    });
-
-    // Logout
-    document.getElementById('logout-btn').addEventListener('click', async () => {
-      try {
-        await auth.signOut();
-        console.log('Logged out');
-      } catch (err) {
-        console.error('Logout error:', err);
-      }
-    });
-
-    // Create Board
-    document.getElementById('create-board-btn').addEventListener('click', async () => {
-      try {
-        const boardName = prompt('Enter board name:');
-        if (!boardName) return;
-
-        const boardRef = await db.collection('boards').add({
-          name: boardName,
-          inviteLink: '',
-          roles: { 'Common': { readOnly: false }, 'User': { readOnly: false } },
-          members: { [currentUser.uid]: { role: 'User', displayName: currentUser.displayName || currentUser.email } }
-        });
-
-        const boardId = boardRef.id;
-        const inviteLink = `${window.location.origin}/join/${boardId}`;
-        await boardRef.update({ inviteLink });
-
-        currentBoardId = boardId;
-        isAdmin = false;
-        userRole = 'User';
-        boardRoles = { 'Common': { readOnly: false }, 'User': { readOnly: false } };
-
-        boardPanel.style.display = 'none';
-        sidebar.style.display = 'flex';
-        canvasContainer.style.display = 'flex';
-        menuBtn.style.display = 'block';
-        initBoard();
-        console.log('Board created:', boardId);
-      } catch (error) {
-        console.error('Error creating board:', error);
-        alert('Error creating board');
-      }
-    });
-
-    // Join Board
-    document.getElementById('join-board-btn').addEventListener('click', async () => {
-      try {
-        const link = document.getElementById('join-link').value.trim();
-        const boardId = link.split('/join/')[1];
-        if (!boardId) {
-          alert('Invalid link');
-          return;
-        }
-
-        const boardDoc = await db.collection('boards').doc(boardId).get();
-        if (!boardDoc.exists) {
-          alert('Board not found');
-          return;
-        }
-
-        const boardData = boardDoc.data();
-        await db.collection('boards').doc(boardId).update({
-          [`members.${currentUser.uid}`]: { role: 'User', displayName: currentUser.displayName || currentUser.email }
-        });
-
-        currentBoardId = boardId;
-        isAdmin = false;
-        userRole = 'User';
-        boardRoles = boardData.roles;
-
-        boardPanel.style.display = 'none';
-        sidebar.style.display = 'flex';
-        canvasContainer.style.display = 'flex';
-        menuBtn.style.display = 'block';
-        initBoard();
-        console.log('Joined board:', boardId, 'User:', currentUser.displayName || currentUser.email);
-      } catch (error) {
-        console.error('Error joining board:', error);
-        alert('Error joining board');
-      }
-    });
-
-    // Export Boards
-    document.getElementById('export-boards-btn').addEventListener('click', async () => {
-      try {
-        const boardsSnapshot = await db.collection('boards')
-          .where(`members.${currentUser.uid}`, '!=', null)
-          .get();
-        const boardsData = [];
-        for (const boardDoc of boardsSnapshot.docs) {
-          const boardId = boardDoc.id;
-          const boardData = boardDoc.data();
-          const elementsSnapshot = await db.collection(`boards/${boardId}/elements`).get();
-          const elements = elementsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          boardsData.push({ id: boardId, ...boardData, elements });
-        }
-        const blob = new Blob([JSON.stringify(boardsData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'boards_export.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        console.log('Boards exported');
-      } catch (error) {
-        console.error('Error exporting boards:', error);
-        alert('Error exporting boards');
-      }
-    });
-
-    // Import Boards
-    document.getElementById('import-boards').addEventListener('change', async (e) => {
-      try {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          const boardsData = JSON.parse(event.target.result);
-          for (const board of boardsData) {
-            const { id, elements, ...boardData } = board;
-            const boardRef = await db.collection('boards').add({
-              ...boardData,
-              members: { [currentUser.uid]: { role: 'User', displayName: currentUser.displayName || currentUser.email } }
-            });
-            for (const element of elements) {
-              await db.collection(`boards/${boardRef.id}/elements`).add(element);
-            }
-            console.log('Imported board:', boardRef.id);
-          }
-          alert('Boards imported');
-        };
-        reader.readAsText(file);
-      } catch (error) {
-        console.error('Error importing boards:', error);
-        alert('Error importing boards');
-      }
-    });
-
-    // Initialize Board
-    function initBoard() {
-      try {
-        stage = new Konva.Stage({
-          container: 'canvas-container',
-          width: window.innerWidth - (window.innerWidth < 768 ? 0 : 256),
-          height: window.innerHeight - (window.innerWidth < 600 ? 48 : 0)
-        });
-
-        backgroundLayer = new Konva.Layer({ listening: false });
-        stage.add(backgroundLayer);
-        updateGrid(stage, backgroundLayer);
-
-        cursorLayer = new Konva.Layer();
-        stage.add(cursorLayer);
-
-        transformerLayer = new Konva.Layer();
-        transformer = new Konva.Transformer({
-          nodes: [],
-          keepRatio: false,
-          enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
-          boundBoxFunc: (oldBox, newBox) => ({
-            width: newBox.width >= 50 ? newBox.width : oldBox.width,
-            height: newBox.height >= 50 ? newBox.height : oldBox.height
-          })
-        });
-        transformerLayer.add(transformer);
-        stage.add(transformerLayer);
-
-        canvases = { 'Common': new Konva.Layer() };
-        Object.keys(boardRoles).forEach(role => {
-          if (role !== 'Common') canvases[role] = new Konva.Layer();
-        });
-        stage.add(canvases[currentCanvas]);
-
-        loadVisibleElements();
-        trackCursors();
-        updateRolesList();
-        setupEventListeners();
-        console.log('Board initialized');
-      } catch (err) {
-        console.error('Error initializing board:', err);
-      }
-    }
-
-    // Load Visible Elements
-    async function loadVisibleElements() {
-      try {
-        const scale = stage.scaleX();
-        const pos = stage.position();
-        const width = stage.width() / scale;
-        const height = stage.height() / scale;
-        const xMin = -pos.x / scale - width / 2;
-        const xMax = xMin + width;
-        const yMin = -pos.y / scale - height / 2;
-        const yMax = yMin + height;
-
-        const snapshot = await db.collection(`boards/${currentBoardId}/elements`)
-          .where('x', '>=', xMin)
-          .where('x', '<=', xMax)
-          .where('y', '>=', yMin)
-          .where('y', '<=', yMax)
-          .get();
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const elementId = doc.id;
-          const role = data.role || 'Common';
-          if (!canvases[role]) return;
-
-          const existing = canvases[role].findOne(`#${elementId}`);
-          if (existing) return;
-
-          const group = createElementFromData(data, elementId);
-          group.id(elementId);
-          canvases[role].add(group);
-        });
-
-        stage.batchDraw();
-      } catch (error) {
-        console.error('Error loading visible elements:', error);
-      }
-    }
-
-    // Track Cursors
-    function trackCursors() {
-      try {
-        const updateCursor = debounce(() => {
-          if (!currentUser || !currentBoardId) return;
-          const pos = stage.getPointerPosition();
-          if (!pos) return;
-          const now = Date.now();
-          if (now - lastCursorUpdate < 300) return;
-          lastCursorUpdate = now;
-          db.collection(`boards/${currentBoardId}/cursors`).doc(currentUser.uid).set({
-            x: pos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-            y: pos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-            displayName: currentUser.displayName || currentUser.email,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-        }, 300);
-
-        stage.on('mousemove touchmove', updateCursor);
-
-        db.collection(`boards/${currentBoardId}/cursors`).onSnapshot(snapshot => {
-          snapshot.docChanges().forEach(change => {
-            const uid = change.doc.id;
-            const data = change.doc.data();
-
-            if (uid === currentUser?.uid) return;
-
-            if (change.type === 'added' || change.type === 'modified') {
-              if (!cursors[uid]) {
-                cursors[uid] = new Konva.Group();
-                const cursor = new Konva.Line({
-                  points: [0, 0, 8, 8, 0, 12],
-                  stroke: getColorForUid(uid),
-                  strokeWidth: 2,
-                  closed: true,
-                  fill: getColorForUid(uid)
-                });
-                const label = new Konva.Text({
-                  x: 10,
-                  y: -2,
-                  text: data.displayName,
-                  fontSize: 10,
-                  fontFamily: 'Arial',
-                  fill: 'white',
-                  padding: 2,
-                  shadowColor: 'black',
-                  shadowBlur: 2
-                });
-                cursors[uid].add(cursor, label);
-                cursorLayer.add(cursors[uid]);
-              }
-
-              cursors[uid].position({
-                x: data.x * stage.scaleX() + stage.x(),
-                y: data.y * stage.scaleY() + stage.y()
-              });
-              cursorLayer.batchDraw();
-            } else if (change.type === 'removed') {
-              if (cursors[uid]) {
-                cursors[uid].destroy();
-                delete cursors[uid];
-                cursorLayer.batchDraw();
-              }
-            }
-          });
-        });
-
-        setInterval(() => {
-          db.collection(`boards/${currentBoardId}/cursors`)
-            .where('lastUpdated', '<', new Date(Date.now() - 10 * 1000))
-            .get()
-            .then(snapshot => {
-              snapshot.forEach(doc => doc.ref.delete());
-            });
-        }, 10000);
-      } catch (error) {
-        console.error('Error tracking cursors:', error);
-      }
-    }
-
-    // Get Color for UID
-    function getColorForUid(uid) {
-      const colors = ['#ff0000', '#00ff00', '#0000ff', '#ff00ff', '#00ffff', '#ffa500'];
-      const index = uid.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % colors.length;
-      return colors[index];
-    }
-
-    // Create Element from Data
-    function createElementFromData(data, elementId) {
-      const group = new Konva.Group({
-        x: data.x,
-        y: data.y,
-        width: data.width,
-        height: data.height,
-        draggable: isEditable(data.role),
-        name: data.type
-      });
-
-      const bg = new Konva.Rect({
-        width: data.width,
-        height: data.height,
-        fill: data.bgFill || '#ffffff',
-        stroke: '#d1d5db',
-        strokeWidth: 2,
-        cornerRadius: 4,
-        shadowColor: 'rgba(0,0,0,0.1)',
-        shadowBlur: 5
-      });
-
-      group.add(bg);
-
-      if (data.type === 'task') {
-        const titleText = new Konva.Text({
-          x: 8,
-          y: 8,
-          text: data.title,
-          fontSize: 12,
-          fontFamily: 'Arial',
-          fontStyle: 'bold',
-          fill: 'black',
-          width: data.width - 16,
-          padding: 4
-        });
-
-        const descText = new Konva.Text({
-          x: 8,
-          y: 32,
-          text: data.desc,
-          fontSize: 10,
-          fontFamily: 'Arial',
-          fill: 'black',
-          width: data.width - 16,
-          padding: 4
-        });
-
-        const statusText = new Konva.Text({
-          x: 8,
-          y: data.height - 24,
-          text: `Status: ${data.status}`,
-          fontSize: 10,
-          fontFamily: 'Arial',
-          fill: data.status === 'Завершено' ? '#22c55e' : data.status === 'В процессе' ? '#f59e0b' : '#ef4444',
-          width: data.width - 16,
-          padding: 4
-        });
-
-        group.add(titleText, descText, statusText);
-      } else if (data.type === 'pdf') {
-        const text = new Konva.Text({
-          x: 8,
-          y: 8,
-          text: data.content,
-          fontSize: 10,
-          fontFamily: 'Arial',
-          fill: 'black',
-          width: data.width - 16,
-          padding: 4
-        });
-        group.add(text);
-      } else if (data.type === 'note') {
-        const titleText = new Konva.Text({
-          x: 8,
-          y: 8,
-          text: data.title,
-          fontSize: 12,
-          fontFamily: 'Arial',
-          fontStyle: 'bold',
-          fill: 'black',
-          width: data.width - 16,
-          padding: 4
-        });
-
-        const contentText = new Konva.Text({
-          x: 8,
-          y: 32,
-          text: data.content,
-          fontSize: 10,
-          fontFamily: 'Arial',
-          fill: 'black',
-          width: data.width - 16,
-          padding: 4
-        });
-
-        group.add(titleText, contentText);
-      } else if (data.type === 'comment') {
-        const authorText = new Konva.Text({
-          x: 8,
-          y: 8,
-          text: `From: ${data.author} (${data.date})`,
-          fontSize: 10,
-          fontFamily: 'Arial',
-          fontStyle: 'italic',
-          fill: 'black',
-          width: data.width - 16,
-          padding: 4
-        });
-
-        const contentText = new Konva.Text({
-          x: 8,
-          y: 32,
-          text: data.content,
-          fontSize: 10,
-          fontFamily: 'Arial',
-          fill: 'black',
-          width: data.width - 16,
-          padding: 4
-        });
-
-        group.add(authorText, contentText);
-      } else if (data.type === 'text') {
-        const contentText = new Konva.Text({
-          x: 8,
-          y: 8,
-          text: data.content,
-          fontSize: 12,
-          fontFamily: 'Arial',
-          fill: 'white',
-          width: data.width - 16,
-          padding: 4
-        });
-        group.add(contentText);
-      }
-
-      if (isEditable(data.role)) {
-        group.on('dblclick', () => editElement(group, data.type));
-        group.on('dragend', () => updateElementData(group, elementId));
-        group.on('transformend', () => updateElementSize(group, elementId));
-      }
-
-      return group;
-    }
-
-    // Check if Role is Editable
-    function isEditable(role) {
-      return role === 'Common' || role === userRole;
-    }
-
-    // Update Roles List
-    function updateRolesList() {
-      try {
-        rolesList.innerHTML = '';
-        const allRoles = ['Common', ...Object.keys(boardRoles)];
-        allRoles.forEach(role => {
-          const li = document.createElement('li');
-          li.className = `p-2 rounded cursor-pointer transition bg-gray-700 hover:bg-gray-600 ${role === currentCanvas ? 'bg-blue-600' : ''} fade-in`;
-          li.textContent = role;
-          li.addEventListener('click', () => {
-            if (!canvases[role]) {
-              canvases[role] = new Konva.Layer();
-              loadVisibleElements();
-            }
-            currentCanvas = role;
-            stage.getLayers().forEach(layer => {
-              if (layer !== backgroundLayer && layer !== transformerLayer && layer !== cursorLayer) layer.remove();
-            });
-            stage.add(canvases[role]);
-            stage.batchDraw();
-            updateRolesList();
-            console.log(`Switched to canvas: ${role}`);
-          });
-          rolesList.appendChild(li);
-        });
-        updateTaskRoleSelect();
-        updateAdminPanel();
-      } catch (error) {
-        console.error('Error updating roles list:', error);
-      }
-    }
-
-    // Update Task Role Select
-    function updateTaskRoleSelect() {
-      try {
-        const taskRoleSelect = document.getElementById('task-role');
-        taskRoleSelect.innerHTML = '<option value="">Select role</option>';
-        ['Common', userRole].forEach(role => {
-          if (role) {
-            const option = document.createElement('option');
-            option.value = role;
-            option.textContent = role;
-            taskRoleSelect.appendChild(option);
-          }
-        });
-      } catch (error) {
-        console.error('Error updating task role select:', error);
-      }
-    }
-
-    // Update Admin Panel
-    async function updateAdminPanel() {
-      try {
-        document.getElementById('toggle-admin').style.display = 'none';
-        document.getElementById('invite-link').value = `${window.location.origin}/join/${currentBoardId}`;
-      } catch (error) {
-        console.error('Error updating admin panel:', error);
-      }
-    }
-
-    // Setup Event Listeners
-    function setupEventListeners() {
-      try {
-        // Menu Toggle (Mobile)
-        menuBtn.addEventListener('click', () => {
-          sidebar.classList.toggle('active');
-        });
-
-        // Admin Panel Toggle
-        document.getElementById('toggle-admin').addEventListener('click', () => {
-          const adminPanel = document.getElementById('admin-panel');
-          adminPanel.style.display = adminPanel.style.display === 'none' ? 'block' : 'none';
-          adminPanel.classList.toggle('slide-in', adminPanel.style.display === 'block');
-        });
-
-        // Generate Invite Link
-        document.getElementById('generate-link').addEventListener('click', async () => {
-          document.getElementById('invite-link').value = `${window.location.origin}/join/${currentBoardId}`;
-          console.log('Invite link updated');
-        });
-
-        // Add Role
-        document.getElementById('add-role').addEventListener('click', async () => {
-          try {
-            const roleInput = document.getElementById('role-input');
-            const role = roleInput.value.trim();
-            if (role && !boardRoles[role]) {
-              boardRoles[role] = { readOnly: false };
-              await db.collection('boards').doc(currentBoardId).update({
-                roles: boardRoles
-              });
-              updateRolesList();
-              roleInput.value = '';
-              console.log('Added role:', role);
-            }
-          } catch (error) {
-            console.error('Error adding role:', error);
-          }
-        });
-
-        // Assign Role
-        document.getElementById('assign-role').addEventListener('click', async () => {
-          try {
-            const uid = document.getElementById('member-select').value;
-            const role = document.getElementById('role-select').value;
-            await db.collection('boards').doc(currentBoardId).update({
-              [`members.${uid}.role`]: role
-            });
-            console.log(`Assigned role ${role} to user ${uid}`);
-          } catch (error) {
-            console.error('Error assigning role:', error);
-          }
-        });
-
-        // Theme Switch
-        document.getElementById('theme-select').addEventListener('change', (e) => {
-          document.body.className = e.target.value === 'light' ? 'min-h-screen bg-gray-100 text-black light' : 'min-h-screen bg-gray-900 text-white';
-          console.log('Theme switched:', e.target.value);
-        });
-
-        // Context Menu
-        let contextTarget = null;
-        let contextPos = { x: 0, y: 0 };
-        let longPressTimer = null;
-        const showContextMenu = (x, y, intersection) => {
-          contextPos.x = x;
-          contextPos.y = y;
-          contextTarget = intersection ? getGroupAncestor(intersection) : null;
-
-          const menuItems = ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text', 'delete-element', 'export-pdf'];
-          menuItems.forEach(item => document.getElementById(item).style.display = 'none');
-
-          if (contextTarget && isEditable(contextTarget.attrs.role)) {
-            document.getElementById('delete-element').style.display = 'block';
-            if (contextTarget.hasName('pdf')) {
-              document.getElementById('export-pdf').style.display = 'block';
-            }
-          } else if (isEditable(currentCanvas)) {
-            ['create-task', 'create-pdf', 'create-note', 'create-comment', 'create-text'].forEach(id => {
-              document.getElementById(id).style.display = 'block';
-            });
-          }
-
-          contextMenu.style.left = `${x}px`;
-          contextMenu.style.top = `${y}px`;
-          contextMenu.style.display = 'block';
-        };
-
-        stage.on('contextmenu', (e) => {
-          e.evt.preventDefault();
-          const pos = stage.getPointerPosition();
-          const intersection = stage.getIntersection(pos);
-          showContextMenu(e.evt.clientX, e.evt.clientY, intersection);
-        });
-
-        // Mobile Long Press
-        stage.on('touchstart', (e) => {
-          const pos = stage.getPointerPosition();
-          const intersection = stage.getIntersection(pos);
-          longPressTimer = setTimeout(() => {
-            showContextMenu(pos.x, pos.y, intersection);
-          }, 500);
-        });
-
-        stage.on('touchend touchmove', () => {
-          if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-          }
-        });
-
-        document.addEventListener('click', (e) => {
-          if (!contextMenu.contains(e.target)) {
-            contextMenu.style.display = 'none';
-            contextTarget = null;
-          }
-        });
-
-        // Transformer Click
-        stage.on('mousedown touchstart', (e) => {
-          const pos = stage.getPointerPosition();
-          const intersection = stage.getIntersection(pos);
-          if (!intersection || intersection.getLayer() === backgroundLayer) {
-            transformer.nodes([]);
+        if (!window.Konva) throw new Error('Konva.js not loaded');
+        if (!window.jspdf) throw new Error('jsPDF not loaded');
+        if (!firebase) throw new Error('Firebase not loaded');
+
+        // Проверка аутентификации
+        auth.onAuthStateChanged(user => {
+          if (user) {
+            currentUser = user;
+            document.getElementById('auth-modal').classList.add('hidden');
+            document.getElementById('board-modal').classList.remove('hidden');
+            document.getElementById('comment-author').value = user.displayName || 'Пользователь';
+            loadUserBoards();
+            console.log('User signed in:', user.displayName);
           } else {
-            const group = getGroupAncestor(intersection);
-            if (group && isEditable(group.attrs.role)) {
-              transformer.nodes([group]);
-            } else {
-              transformer.nodes([]);
-            }
+            document.getElementById('auth-modal').classList.remove('hidden');
+            document.getElementById('board-modal').classList.add('hidden');
+            document.getElementById('canvas-container').classList.add('hidden');
+            document.getElementById('sidebar').classList.add('hidden');
+            console.log('No user signed in');
           }
-          stage.batchDraw();
         });
 
-        // Create Task
-        document.getElementById('create-task').addEventListener('click', () => {
-          contextMenu.style.display = 'none';
-          document.getElementById('task-modal').style.display = 'flex';
-          document.getElementById('task-title').value = '';
-          document.getElementById('task-desc').value = '';
+        // Вход через Google
+        document.getElementById('google-signin').addEventListener('click', () => {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          auth.signInWithPopup(provider).catch(error => {
+            console.error('Error signing in:', error);
+            alert('Ошибка входа: ' + error.message);
+          });
         });
 
-        // Cancel Task
-        document.getElementById('cancel-task').addEventListener('click', () => {
-          document.getElementById('task-modal').style.display = 'none';
-          document.getElementById('task-title').value = '';
-          document.getElementById('task-desc').value = '';
+        // Выход
+        document.getElementById('logout').addEventListener('click', () => {
+          auth.signOut().then(() => {
+            console.log('User signed out');
+            currentBoardId = null;
+            document.getElementById('sidebar').classList.remove('open');
+          }).catch(error => {
+            console.error('Error signing out:', error);
+          });
         });
 
-        // Save Task
-        let editingTask = null;
-        document.getElementById('save-task').addEventListener('click', async () => {
+        // Создание новой доски
+        document.getElementById('create-board').addEventListener('click', async () => {
           try {
+            const boardRef = await db.collection('boards').add({
+              name: `Доска ${new Date().toLocaleString('ru-RU')}`,
+              owner: currentUser.uid,
+              users: [currentUser.uid],
+              roles: ['Администратор', 'Разработчик', 'Дизайнер'],
+              canvases: { 'Общий': [] }
+            });
+            currentBoardId = boardRef.id;
+            document.getElementById('board-modal').classList.add('hidden');
+            document.getElementById('canvas-container').classList.remove('hidden');
+            document.getElementById('sidebar').classList.remove('hidden');
+            initBoard();
+            console.log('Created board:', currentBoardId);
+          } catch (error) {
+            console.error('Error creating board:', error);
+          }
+        });
+
+        // Присоединение по ссылке
+        document.getElementById('join-board').addEventListener('click', async () => {
+          try {
+            const link = document.getElementById('join-link').value.trim();
+            const boardId = link.split('/').pop();
+            const boardDoc = await db.collection('boards').doc(boardId).get();
+            if (boardDoc.exists) {
+              await db.collection('boards').doc(boardId).update({
+                users: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+              });
+              currentBoardId = boardId;
+              document.getElementById('board-modal').classList.add('hidden');
+              document.getElementById('canvas-container').classList.remove('hidden');
+              document.getElementById('sidebar').classList.remove('hidden');
+              initBoard();
+              console.log('Joined board:', boardId);
+            } else {
+              alert('Доска не найдена');
+            }
+          } catch (error) {
+            console.error('Error joining board:', error);
+          }
+        });
+
+        // Загрузка досок пользователя
+        async function loadUserBoards() {
+          try {
+            const boardsList = document.getElementById('boards-list');
+            boardsList.innerHTML = '';
+            const querySnapshot = await db.collection('boards')
+              .where('users', 'array-contains', currentUser.uid)
+              .get();
+            querySnapshot.forEach(doc => {
+              const board = doc.data();
+              const div = document.createElement('div');
+              div.className = `p-2 rounded cursor-pointer transition ${doc.id === currentBoardId ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} fade-in`;
+              div.textContent = board.name;
+              div.addEventListener('click', () => {
+                currentBoardId = doc.id;
+                document.getElementById('board-modal').classList.add('hidden');
+                document.getElementById('canvas-container').classList.remove('hidden');
+                document.getElementById('sidebar').classList.remove('hidden');
+                initBoard();
+                loadUserBoards();
+              });
+              boardsList.appendChild(div);
+            });
+            console.log('Loaded user boards');
+          } catch (error) {
+            console.error('Error loading boards:', error);
+          }
+        }
+
+        // Инициализация доски
+        let stage, backgroundLayer, transformerLayer, transformer, canvases, currentCanvas, roles, rolesList;
+        async function initBoard() {
+          // Инициализация Konva.js
+          stage = new Konva.Stage({
+            container: 'canvas-container',
+            width: window.innerWidth - (window.innerWidth <= 768 ? 0 : 256),
+            height: window.innerHeight,
+          });
+
+          // Сетка
+          backgroundLayer = new Konva.Layer({ listening: false });
+          const gridSpacing = 50;
+          function updateGrid() {
+            backgroundLayer.destroyChildren();
+            const scale = stage.scaleX();
+            const stagePos = stage.position();
+            const visibleWidth = stage.width() / scale;
+            const visibleHeight = stage.height() / scale;
+            const startX = Math.floor((-stagePos.x / scale - visibleWidth) / gridSpacing) * gridSpacing;
+            const startY = Math.floor((-stagePos.y / scale - visibleHeight) / gridSpacing) * gridSpacing;
+            const endX = startX + visibleWidth * 2;
+            const endY = startY + visibleHeight * 2;
+
+            for (let y = startY; y < endY; y += gridSpacing) {
+              backgroundLayer.add(new Konva.Line({
+                points: [startX, y, endX, y],
+                stroke: 'rgba(255, 255, 255, 0.2)',
+                strokeWidth: 1 / scale,
+              }));
+            }
+            for (let x = startX; x < endX; x += gridSpacing) {
+              backgroundLayer.add(new Konva.Line({
+                points: [x, startY, x, endY],
+                stroke: 'rgba(255, 255, 255, 0.2)',
+                strokeWidth: 1 / scale,
+              }));
+            }
+            backgroundLayer.batchDraw();
+          }
+          stage.add(backgroundLayer);
+          updateGrid();
+
+          // Transformer
+          transformerLayer = new Konva.Layer();
+          transformer = new Konva.Transformer({
+            nodes: [],
+            keepRatio: false,
+            enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+            boundBoxFunc: (oldBox, newBox) => {
+              if (newBox.width < 50 || newBox.height < 50) return oldBox;
+              return newBox;
+            },
+          });
+          transformerLayer.add(transformer);
+          stage.add(transformerLayer);
+
+          // Холсты и роли
+          canvases = { 'Общий': new Konva.Layer() };
+          currentCanvas = 'Общий';
+          rolesList = document.getElementById('roles-list');
+
+          // Загрузка данных доски
+          const boardDoc = await db.collection('boards').doc(currentBoardId).get();
+          const boardData = boardDoc.data();
+          roles = boardData.roles || ['Администратор', 'Разработчик', 'Дизайнер'];
+          Object.keys(boardData.canvases || {}).forEach(role => {
+            canvases[role] = new Konva.Layer();
+            boardData.canvases[role].forEach(item => {
+              const group = createGroupFromData(item);
+              canvases[role].add(group);
+            });
+          });
+          stage.add(canvases[currentCanvas]);
+          updateRolesList();
+
+          // Создание группы из данных Firestore
+          function createGroupFromData(data) {
+            const group = new Konva.Group({
+              x: data.x,
+              y: data.y,
+              draggable: true,
+              name: data.type,
+              id: data.id,
+            });
+
+            const bg = new Konva.Rect(data.bg);
+            let textNodes = [];
+            if (data.type === 'task') {
+              textNodes = [
+                new Konva.Text(data.texts.title),
+                new Konva.Text(data.texts.desc),
+                new Konva.Text(data.texts.status),
+              ];
+              group.on('dblclick', () => {
+                if (group.name() !== 'task') return;
+                const texts = group.find('.Text');
+                if (texts.length < 3) {
+                  console.error('Invalid task card:', group.id(), texts.length);
+                  alert('Ошибка: задача имеет некорректную структуру.');
+                  return;
+                }
+                editingTask = group;
+                document.getElementById('task-modal').classList.remove('hidden');
+                document.getElementById('task-title').value = texts[0].text();
+                document.getElementById('task-desc').value = texts[1].text();
+                document.getElementById('task-status').value = texts[2].text().replace('Статус: ', '');
+                document.getElementById('task-role').value = data.role;
+              });
+            } else if (data.type === 'pdf') {
+              textNodes = [new Konva.Text(data.texts.content)];
+              group.on('dblclick', () => {
+                editingPdf = group;
+                document.getElementById('pdf-modal').classList.remove('hidden');
+                document.getElementById('pdf-content').value = textNodes[0].text();
+                document.getElementById('task-role').value = data.role;
+              });
+              group.on('dragend', handlePdfDragEnd);
+            } else if (data.type === 'note') {
+              textNodes = [
+                new Konva.Text(data.texts.title),
+                new Konva.Text(data.texts.content),
+              ];
+              group.on('dblclick', () => {
+                editingNote = group;
+                document.getElementById('note-modal').classList.remove('hidden');
+                document.getElementById('note-title').value = textNodes[0].text();
+                document.getElementById('note-content').value = textNodes[1].text();
+                document.getElementById('task-role').value = data.role;
+              });
+            } else if (data.type === 'comment') {
+              textNodes = [
+                new Konva.Text(data.texts.author),
+                new Konva.Text(data.texts.content),
+              ];
+              group.on('dblclick', () => {
+                editingComment = group;
+                document.getElementById('comment-modal').classList.remove('hidden');
+                document.getElementById('comment-author').value = data.texts.author.text.replace(/ \(.*\)/, '');
+                document.getElementById('comment-content').value = textNodes[1].text();
+                document.getElementById('task-role').value = data.role;
+              });
+            } else if (data.type === 'text') {
+              textNodes = [new Konva.Text(data.texts.content)];
+              group.on('dblclick', () => {
+                editingText = group;
+                document.getElementById('text-modal').classList.remove('hidden');
+                document.getElementById('text-content').value = textNodes[0].text();
+                document.getElementById('task-role').value = data.role;
+              });
+            }
+
+            group.add(bg, ...textNodes);
+            group.on('transform', () => {
+              bg.width(group.width() / group.scaleX());
+              bg.height(group.height() / group.scaleY());
+              textNodes.forEach(text => text.width(bg.width() - 20));
+              if (data.type === 'task') textNodes[2].y(bg.height() - 30);
+            });
+            return group;
+          }
+
+          // Обновление списка ролей
+          function updateRolesList() {
+            rolesList.innerHTML = '';
+            const allCanvases = ['Общий', ...roles];
+            allCanvases.forEach(role => {
+              const li = document.createElement('li');
+              li.className = `p-2 rounded cursor-pointer transition ${role === currentCanvas ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} fade-in`;
+              li.textContent = role;
+              li.addEventListener('click', () => {
+                if (!canvases[role]) canvases[role] = new Konva.Layer();
+                currentCanvas = role;
+                stage.getLayers().forEach(layer => {
+                  if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
+                });
+                stage.add(canvases[role]);
+                stage.batchDraw();
+                updateRolesList();
+                console.log(`Switched to canvas: ${role}`);
+              });
+              rolesList.appendChild(li);
+            });
+            updateTaskRoleSelect();
+          }
+
+          // Обновление выпадающего списка ролей
+          function updateTaskRoleSelect() {
+            const taskRoleSelect = document.getElementById('task-role');
+            taskRoleSelect.innerHTML = '<option value="">Выберите роль</option>';
+            roles.forEach(role => {
+              const option = document.createElement('option');
+              option.value = role;
+              option.textContent = role;
+              taskRoleSelect.appendChild(option);
+            });
+          }
+
+          // Сохранение состояния доски
+          async function saveBoard() {
+            const canvasData = {};
+            Object.keys(canvases).forEach(role => {
+              canvasData[role] = canvases[role].find('.Group').map(group => ({
+                id: group.id(),
+                type: group.name(),
+                x: group.x(),
+                y: group.y(),
+                role: role,
+                bg: group.findOne('Rect').attrs,
+                texts: group.name() === 'task' ? {
+                  title: group.find('.Text')[0].attrs,
+                  desc: group.find('.Text')[1].attrs,
+                  status: group.find('.Text')[2].attrs,
+                } : group.name() === 'pdf' ? {
+                  content: group.findOne('Text').attrs,
+                } : group.name() === 'note' ? {
+                  title: group.find('.Text')[0].attrs,
+                  content: group.find('.Text')[1].attrs,
+                } : group.name() === 'comment' ? {
+                  author: group.find('.Text')[0].attrs,
+                  content: group.find('.Text')[1].attrs,
+                } : { content: group.findOne('Text').attrs },
+              }));
+            });
+            await db.collection('boards').doc(currentBoardId).update({
+              canvases: canvasData,
+              roles: roles,
+            });
+            console.log('Board saved:', currentBoardId);
+          }
+
+          // Контекстное меню
+          const contextMenu = document.getElementById('context-menu');
+          let contextTarget = null;
+          let contextPos = { x: 0, y: 0 };
+          stage.on('contextmenu', e => {
+            e.evt.preventDefault();
+            contextPos = stage.getPointerPosition();
+            const intersection = stage.getIntersection(contextPos);
+            contextTarget = null;
+
+            if (intersection) {
+              const parent = intersection.getParent();
+              if (parent && parent instanceof Konva.Group && ['task', 'pdf', 'note', 'comment', 'text'].includes(parent.name())) {
+                contextTarget = parent;
+              }
+            }
+
+            document.getElementById('create-task').classList.toggle('hidden', !!contextTarget);
+            document.getElementById('create-pdf').classList.toggle('hidden', !!contextTarget);
+            document.getElementById('create-note').classList.toggle('hidden', !!contextTarget);
+            document.getElementById('create-comment').classList.toggle('hidden', !!contextTarget);
+            document.getElementById('create-text').classList.toggle('hidden', !!contextTarget);
+            document.getElementById('delete-element').classList.toggle('hidden', !contextTarget);
+            document.getElementById('export-pdf').classList.toggle('hidden', !contextTarget || contextTarget.name() !== 'pdf');
+
+            contextMenu.style.left = `${e.evt.clientX}px`;
+            contextMenu.style.top = `${e.evt.clientY}px`;
+            contextMenu.classList.remove('hidden');
+            console.log('Opened context menu at:', e.evt.clientX, e.evt.clientY, 'target:', contextTarget ? contextTarget.name() : 'none');
+          });
+
+          document.addEventListener('click', e => {
+            if (!contextMenu.contains(e.target)) {
+              contextMenu.classList.add('hidden');
+              contextTarget = null;
+            }
+          });
+
+          // Transformer
+          stage.on('click', e => {
+            const pos = stage.getPointerPosition();
+            const intersection = stage.getIntersection(pos);
+            if (!intersection || intersection.getLayer() === backgroundLayer) {
+              transformer.nodes([]);
+            } else {
+              const parent = intersection.getParent();
+              if (parent && parent instanceof Konva.Group && ['task', 'pdf', 'note', 'comment', 'text'].includes(parent.name())) {
+                transformer.nodes([parent]);
+                console.log('Selected element for transform:', parent.name());
+              } else {
+                transformer.nodes([]);
+              }
+            }
+            stage.batchDraw();
+          });
+
+          // Создание задачи
+          let editingTask = null;
+          document.getElementById('create-task').addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+            document.getElementById('task-modal').classList.remove('hidden');
+            document.getElementById('task-title').value = '';
+            document.getElementById('task-desc').value = '';
+            editingTask = null;
+          });
+
+          document.getElementById('cancel-task').addEventListener('click', () => {
+            document.getElementById('task-modal').classList.add('hidden');
+            document.getElementById('task-title').value = '';
+            document.getElementById('task-desc').value = '';
+          });
+
+          document.getElementById('save-task').addEventListener('click', async () => {
             const title = document.getElementById('task-title').value.trim();
             const desc = document.getElementById('task-desc').value.trim();
             const status = document.getElementById('task-status').value;
-            const role = document.getElementById('task-role').value || currentCanvas;
+            const role = document.getElementById('task-role').value || 'Общий';
 
             if (!title || !desc) {
-              alert('Please fill in title and description');
+              alert('Заполните заголовок и описание');
               return;
             }
 
-            if (!isEditable(role)) {
-              alert('No edit permissions');
-              return;
+            if (!canvases[role]) {
+              canvases[role] = new Konva.Layer();
+              if (role !== 'Общий' && !roles.includes(role)) {
+                roles.push(role);
+                updateRolesList();
+              }
             }
 
-            const taskData = {
-              type: 'task',
-              role,
-              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-              width: 150,
-              height: 120,
-              bgFill: '#ffffff',
-              title,
-              desc,
-              status,
-              createdBy: currentUser.uid
-            };
-
+            let card;
             if (editingTask) {
-              await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(taskData);
+              card = editingTask;
+              const textNodes = card.find('.Text');
+              if (textNodes.length < 3) {
+                console.error('Invalid task card:', card.id(), textNodes.length);
+                alert('Ошибка: задача имеет некорректную структуру.');
+                return;
+              }
+              textNodes[0].text(title);
+              textNodes[1].text(desc);
+              textNodes[2].text(`Статус: ${status}`);
+              textNodes[2].fill(status === 'Завершено' ? '#22c55e' : status === 'В процессе' ? '#f59e0b' : '#ef4444');
               editingTask = null;
             } else {
-              await db.collection(`boards/${currentBoardId}/elements`).add(taskData);
+              card = new Konva.Group({
+                x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+                y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+                draggable: true,
+                name: 'task',
+                id: `task-${Date.now()}`,
+              });
+
+              const bg = new Konva.Rect({
+                width: 200,
+                height: 150,
+                fill: '#ffffff',
+                stroke: '#d1d5db',
+                strokeWidth: 2,
+                cornerRadius: 8,
+                shadowColor: 'rgba(0,0,0,0.2)',
+                shadowBlur: 10,
+                shadowOffset: { x: 2, y: 2 },
+              });
+
+              const titleText = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: title,
+                fontSize: 16,
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                fill: 'black',
+                width: 180,
+                padding: 5,
+              });
+
+              const descText = new Konva.Text({
+                x: 10,
+                y: 40,
+                text: desc,
+                fontSize: 14,
+                fontFamily: 'Arial',
+                fill: 'black',
+                width: 180,
+                padding: 5,
+              });
+
+              const statusText = new Konva.Text({
+                x: 10,
+                y: 120,
+                text: `Статус: ${status}`,
+                fontSize: 14,
+                fontFamily: 'Arial',
+                fill: status === 'Завершено' ? '#22c55e' : status === 'В процессе' ? '#f59e0b' : '#ef4444',
+                width: 180,
+                padding: 5,
+              });
+
+              card.add(bg, titleText, descText, statusText);
+              canvases[role].add(card);
+
+              console.log('Created task card:', {
+                id: card.id(),
+                name: card.name(),
+                textNodes: card.find('.Text').length,
+                children: card.getChildren().map(child => child.getClassName()),
+              });
+
+              card.on('dblclick', () => {
+                if (card.name() !== 'task') return;
+                const textNodes = card.find('.Text');
+                if (textNodes.length < 3) {
+                  console.error('Invalid task card:', card.id(), textNodes.length);
+                  alert('Ошибка: задача имеет некорректную структуру.');
+                  return;
+                }
+                editingTask = card;
+                document.getElementById('task-modal').classList.remove('hidden');
+                document.getElementById('task-title').value = textNodes[0].text();
+                document.getElementById('task-desc').value = textNodes[1].text();
+                document.getElementById('task-status').value = textNodes[2].text().replace('Статус: ', '');
+                document.getElementById('task-role').value = role;
+              });
+
+              card.on('transform', () => {
+                bg.width(card.width() / card.scaleX());
+                bg.height(card.height() / card.scaleY());
+                titleText.width(bg.width() - 20);
+                descText.width(bg.width() - 20);
+                statusText.width(bg.width() - 20);
+                statusText.y(bg.height() - 30);
+              });
             }
 
-            document.getElementById('task-modal').style.display = 'none';
+            if (currentCanvas === role) {
+              stage.getLayers().forEach(layer => {
+                if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
+              });
+              stage.add(canvases[role]);
+              stage.batchDraw();
+            }
+            document.getElementById('task-modal').classList.add('hidden');
             document.getElementById('task-title').value = '';
             document.getElementById('task-desc').value = '';
-          } catch (error) {
-            console.error('Error saving task:', error);
-          }
-        });
+            await saveBoard();
+          });
 
-        // Create PDF
-        document.getElementById('create-pdf').addEventListener('click', () => {
-          contextMenu.style.display = 'none';
-          document.getElementById('pdf-modal').style.display = 'flex';
-          document.getElementById('pdf-content').value = '';
-        });
-
-        // Cancel PDF
-        document.getElementById('cancel-pdf').addEventListener('click', () => {
-          document.getElementById('pdf-modal').style.display = 'none';
-          document.getElementById('pdf-content').value = '';
-        });
-
-        // Save PDF
-        document.getElementById('save-pdf').addEventListener('click', async () => {
-          try {
-            const content = document.getElementById('pdf-content').value.trim();
-            const role = currentCanvas;
-
-            if (!content) {
-              alert('Please fill in content');
-              return;
-            }
-
-            if (!isEditable(role)) {
-              alert('No edit permissions');
-              return;
-            }
-
-            const pdfData = {
-              type: 'pdf',
-              role,
-              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-              width: 150,
-              height: 120,
-              bgFill: '#ffffff',
-              content,
-              createdBy: currentUser.uid
-            };
-
-            if (editingTask) {
-              await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(pdfData);
-              editingTask = null;
-            } else {
-              await db.collection(`boards/${currentBoardId}/elements`).add(pdfData);
-            }
-
-            document.getElementById('pdf-modal').style.display = 'none';
+          // Создание PDF
+          let editingPdf = null;
+          document.getElementById('create-pdf').addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+            document.getElementById('pdf-modal').classList.remove('hidden');
             document.getElementById('pdf-content').value = '';
-          } catch (error) {
-            console.error('Error saving PDF:', error);
+            editingPdf = null;
+          });
+
+          document.getElementById('cancel-pdf').addEventListener('click', () => {
+            document.getElementById('pdf-modal').classList.add('hidden');
+            document.getElementById('pdf-content').value = '';
+          });
+
+          function handlePdfDragEnd() {
+            const pdfPos = this.getAbsolutePosition();
+            const pdfSize = { width: this.width(), height: this.height() };
+            canvases[currentCanvas].find('.task').forEach(task => {
+              const taskPos = task.getAbsolutePosition();
+              if (
+                taskPos.x >= pdfPos.x &&
+                taskPos.x <= pdfPos.x + pdfSize.width &&
+                taskPos.y >= pdfPos.y &&
+                taskPos.y <= pdfPos.y + pdfSize.height
+              ) {
+                console.log('Moving task to PDF:', task.id());
+                task.moveTo(this);
+                if (task.find('.Text').length < 3) {
+                  console.error('Corrupted task after move:', task.id());
+                }
+              }
+            });
+            stage.batchDraw();
+            saveBoard();
           }
-        });
 
-        // Create Note
-        document.getElementById('create-note').addEventListener('click', () => {
-          contextMenu.style.display = 'none';
-          document.getElementById('note-modal').style.display = 'flex';
-          document.getElementById('note-title').value = '';
-          document.getElementById('note-content').value = '';
-        });
-
-        // Cancel Note
-        document.getElementById('cancel-note').addEventListener('click', () => {
-          document.getElementById('note-modal').style.display = 'none';
-          document.getElementById('note-title').value = '';
-          document.getElementById('note-content').value = '';
-        });
-
-        // Save Note
-        document.getElementById('save-note').addEventListener('click', async () => {
-          try {
-            const title = document.getElementById('note-title').value.trim();
-            const content = document.getElementById('note-content').value.trim();
-            const role = currentCanvas;
-
-            if (!title || !content) {
-              alert('Please fill in title and content');
-              return;
-            }
-
-            if (!isEditable(role)) {
-              alert('No edit permissions');
-              return;
-            }
-
-            const noteData = {
-              type: 'note',
-              role,
-              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-              width: 150,
-              height: 120,
-              bgFill: '#ffffff',
-              title,
-              content,
-              createdBy: currentUser.uid
-            };
-
-            if (editingTask) {
-              await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(noteData);
-              editingTask = null;
-            } else {
-              await db.collection(`boards/${currentBoardId}/elements`).add(noteData);
-            }
-
-            document.getElementById('note-modal').style.display = 'none';
-            document.getElementById('note-title').value = '';
-            document.getElementById('note-content').value = '';
-          } catch (error) {
-            console.error('Error saving note:', error);
-          }
-        });
-
-        // Create Comment
-        document.getElementById('create-comment').addEventListener('click', () => {
-          contextMenu.style.display = 'none';
-          document.getElementById('comment-modal').style.display = 'flex';
-          document.getElementById('comment-author').value = currentUser.displayName || currentUser.email;
-          document.getElementById('comment-content').value = '';
-        });
-
-        // Cancel Comment
-        document.getElementById('cancel-comment').addEventListener('click', () => {
-          document.getElementById('comment-modal').style.display = 'none';
-          document.getElementById('comment-content').value = '';
-        });
-
-        // Save Comment
-        document.getElementById('save-comment').addEventListener('click', async () => {
-          try {
-            const author = document.getElementById('comment-author').value.trim();
-            const content = document.getElementById('comment-content').value.trim();
-            const role = currentCanvas;
-            const date = new Date().toLocaleDateString();
-
-            if (!author || !content) {
-              alert('Please fill in author and content');
-              return;
-            }
-
-            if (!isEditable(role)) {
-              alert('No edit permissions');
-              return;
-            }
-
-            const commentData = {
-              type: 'comment',
-              role,
-              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-              width: 150,
-              height: 120,
-              bgFill: '#ffffff',
-              author,
-              content,
-              date,
-              createdBy: currentUser.uid
-            };
-
-            if (editingTask) {
-              await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(commentData);
-              editingTask = null;
-            } else {
-              await db.collection(`boards/${currentBoardId}/elements`).add(commentData);
-            }
-
-            document.getElementById('comment-modal').style.display = 'none';
-            document.getElementById('comment-content').value = '';
-          } catch (error) {
-            console.error('Error saving comment:', error);
-          }
-        });
-
-        // Create Text
-        document.getElementById('create-text').addEventListener('click', () => {
-          contextMenu.style.display = 'none';
-          document.getElementById('text-modal').style.display = 'flex';
-          document.getElementById('text-content').value = '';
-        });
-
-        // Cancel Text
-        document.getElementById('cancel-text').addEventListener('click', () => {
-          document.getElementById('text-modal').style.display = 'none';
-          document.getElementById('text-content').value = '';
-        });
-
-        // Save Text
-        document.getElementById('save-text').addEventListener('click', async () => {
-          try {
-            const content = document.getElementById('text-content').value.trim();
-            const role = currentCanvas;
+          document.getElementById('save-pdf').addEventListener('click', async () => {
+            const content = document.getElementById('pdf-content').value.trim();
+            const role = document.getElementById('task-role').value || 'Общий';
 
             if (!content) {
-              alert('Please fill in content');
+              alert('Введите содержимое PDF');
               return;
             }
 
-            if (!isEditable(role)) {
-              alert('No edit permissions');
-              return;
+            if (!canvases[role]) {
+              canvases[role] = new Konva.Layer();
+              if (role !== 'Общий' && !roles.includes(role)) {
+                roles.push(role);
+                updateRolesList();
+              }
             }
 
-            const textData = {
-              type: 'text',
-              role,
-              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-              width: 150,
-              height: 120,
-              bgFill: '#ffffff',
-              content,
-              createdBy: currentUser.uid
-            };
-
-            if (editingTask) {
-              await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(textData);
-              editingTask = null;
+            let pdfGroup;
+            if (editingPdf) {
+              pdfGroup = editingPdf;
+              pdfGroup.findOne('Text').text(content);
+              editingPdf = null;
             } else {
-              await db.collection(`boards/${currentBoardId}/elements`).add(textData);
+              pdfGroup = new Konva.Group({
+                x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+                y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+                draggable: true,
+                name: 'pdf',
+                id: `pdf-${Date.now()}`,
+              });
+
+              const bg = new Konva.Rect({
+                width: 300,
+                height: 400,
+                fill: '#f8f8f8',
+                stroke: '#d1d5db',
+                strokeWidth: 2,
+                cornerRadius: 8,
+                shadowColor: 'rgba(0,0,0,0.2)',
+                shadowBlur: 10,
+                shadowOffset: { x: 2, y: 2 },
+              });
+
+              const text = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: content,
+                fontSize: 14,
+                fontFamily: 'Arial',
+                fill: 'black',
+                width: 280,
+                padding: 5,
+              });
+
+              pdfGroup.add(bg, text);
+              canvases[role].add(pdfGroup);
+
+              pdfGroup.on('dblclick', () => {
+                editingPdf = pdfGroup;
+                document.getElementById('pdf-modal').classList.remove('hidden');
+                document.getElementById('pdf-content').value = text.text();
+                document.getElementById('task-role').value = role;
+              });
+
+              pdfGroup.on('dragend', handlePdfDragEnd);
+
+              pdfGroup.on('transform', () => {
+                bg.width(pdfGroup.width() / pdfGroup.scaleX());
+                bg.height(pdfGroup.height() / pdfGroup.scaleY());
+                text.width(bg.width() - 20);
+              });
             }
 
-            document.getElementById('text-modal').style.display = 'none';
-            document.getElementById('text-content').value = '';
-          } catch (error) {
-            console.error('Error saving text:', error);
-          }
-        });
-
-        // Delete Element
-        document.getElementById('delete-element').addEventListener('click', async () => {
-          try {
-            if (contextTarget && isEditable(contextTarget.attrs.role)) {
-              await db.collection(`boards/${currentBoardId}/elements`).doc(contextTarget.id()).delete();
-              contextMenu.style.display = 'none';
-              contextTarget = null;
+            if (currentCanvas === role) {
+              stage.getLayers().forEach(layer => {
+                if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
+              });
+              stage.add(canvases[role]);
+              stage.batchDraw();
             }
-          } catch (error) {
-            console.error('Error deleting element:', error);
-          }
-        });
+            document.getElementById('pdf-modal').classList.add('hidden');
+            document.getElementById('pdf-content').value = '';
+            await saveBoard();
+          });
 
-        // Export PDF
-        document.getElementById('export-pdf').addEventListener('click', () => {
-          try {
-            if (contextTarget && contextTarget.hasName('pdf')) {
+          // Экспорт PDF
+          document.getElementById('export-pdf').addEventListener('click', () => {
+            if (contextTarget && contextTarget.name() === 'pdf') {
               const { jsPDF } = window.jspdf;
               const doc = new jsPDF();
-              const content = contextTarget.find('Text')[0].text();
-              doc.text(content, 10, 10);
-              doc.save('exported.pdf');
-              contextMenu.style.display = 'none';
-              console.log('PDF exported');
+              const text = contextTarget.findOne('Text').text();
+              const children = contextTarget.find('.task').map(task => ({
+                title: task.find('.Text')[0].text(),
+                desc: task.find('.Text')[1].text(),
+                status: task.find('.Text')[2].text(),
+              }));
+
+              doc.text('PDF Content:', 10, 10);
+              doc.text(text, 10, 20);
+              if (children.length) {
+                doc.text('Tasks:', 10, 40);
+                children.forEach((child, i) => {
+                  doc.text(`${i + 1}. ${child.title} (${child.status})`, 10, 50 + i * 20);
+                  doc.text(`   ${child.desc}`, 10, 60 + i * 20);
+                });
+              }
+              doc.save('canvas_pdf.pdf');
+              contextMenu.classList.add('hidden');
             }
-          } catch (error) {
-            console.error('Error exporting PDF:', error);
-          }
-        });
+          });
 
-        // Zoom and Pan
-        let scale = 1;
-        const zoomHandler = debounce((e) => {
-          e.evt.preventDefault();
-          const oldScale = scale;
-          const pointer = stage.getPointerPosition();
-          const mousePointTo = {
-            x: pointer.x / oldScale - stage.x() / oldScale,
-            y: pointer.y / oldScale - stage.y() / oldScale
-          };
+          // Экспорт всей доски
+          document.getElementById('export-board').addEventListener('click', async () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            let yOffset = 10;
+            Object.keys(canvases).forEach(role => {
+              doc.text(`Роль: ${role}`, 10, yOffset);
+              yOffset += 10;
+              canvases[role].find('.Group').forEach(group => {
+                const texts = group.find('.Text').map(text => text.text());
+                doc.text(`${group.name()}:`, 10, yOffset);
+                yOffset += 10;
+                texts.forEach(text => {
+                  doc.text(text, 15, yOffset);
+                  yOffset += 10;
+                });
+                if (group.name() === 'pdf') {
+                  group.find('.task').forEach(task => {
+                    const taskTexts = task.find('.Text').map(t => t.text());
+                    doc.text('Задача в PDF:', 15, yOffset);
+                    yOffset += 10;
+                    taskTexts.forEach(t => {
+                      doc.text(t, 20, yOffset);
+                      yOffset += 10;
+                    });
+                  });
+                }
+                yOffset += 10;
+              });
+            });
+            doc.save(`board_${currentBoardId}.pdf`);
+            console.log('Exported board:', currentBoardId);
+          });
 
-          const deltaY = e.evt.deltaY;
-          scale *= (deltaY > 0 ? 0.9 : 1.1);
-          scale = Math.max(0.3, Math.min(scale, 4));
+          // Создание заметки
+          let editingNote = null;
+          document.getElementById('create-note').addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+            document.getElementById('note-modal').classList.remove('hidden');
+            document.getElementById('note-title').value = '';
+            document.getElementById('note-content').value = '';
+            editingNote = null;
+          });
 
-          stage.scale({ x: scale, y: scale });
-          const newPos = {
-            x: -(mousePointTo.x - pointer.x / scale) * scale,
-            y: -(mousePointTo.y - pointer.y / scale) * scale
-          };
-          stage.position(newPos);
-          updateGrid(stage, backgroundLayer);
-          loadVisibleElements();
-          stage.batchDraw();
-        }, 100);
+          document.getElementById('cancel-note').addEventListener('click', () => {
+            document.getElementById('note-modal').classList.add('hidden');
+            document.getElementById('note-title').value = '';
+            document.getElementById('note-content').value = '';
+          });
 
-        stage.on('wheel', zoomHandler);
+          document.getElementById('save-note').addEventListener('click', async () => {
+            const title = document.getElementById('note-title').value.trim();
+            const content = document.getElementById('note-content').value.trim();
+            const role = document.getElementById('task-role').value || 'Общий';
 
-        // Touch Zoom and Pan
-        let lastDist = 0;
-        let startPos = null;
-        stage.on('touchstart', (e) => {
-          if (e.evt.touches.length === 2) {
-            const touch1 = e.evt.touches[0];
-            const touch2 = e.evt.touches[1];
-            lastDist = Math.sqrt((touch1.clientX - touch2.clientX) ** 2 + (touch1.clientY - touch2.clientY) ** 2);
-            startPos = stage.position();
-          }
-        });
+            if (!title || !content) {
+              alert('Заполните заголовок и содержимое');
+              return;
+            }
 
-        stage.on('touchmove', (e) => {
-          if (e.evt.touches.length === 2) {
-            e.evt.preventDefault();
-            const touch1 = e.evt.touches[0];
-            const touch2 = e.evt.touches[1];
-            const dist = Math.sqrt((touch1.clientX - touch2.clientX) ** 2 + (touch1.clientY - touch2.clientY) ** 2);
-            if (dist > 0) {
-              const oldScale = scale;
-              scale *= (dist / lastDist);
-              scale = Math.max(0.3, Math.min(scale, 4));
-              stage.scale({ x: scale, y: scale });
-              updateGrid(stage, backgroundLayer);
-              loadVisibleElements();
+            if (!canvases[role]) {
+              canvases[role] = new Konva.Layer();
+              if (role !== 'Общий' && !roles.includes(role)) {
+                roles.push(role);
+                updateRolesList();
+              }
+            }
+
+            let noteGroup;
+            if (editingNote) {
+              noteGroup = editingNote;
+              const textNodes = noteGroup.find('.Text');
+              if (textNodes.length < 2) {
+                console.error('Invalid note:', noteGroup.id(), textNodes.length);
+                alert('Ошибка: заметка имеет некорректную структуру.');
+                return;
+              }
+              textNodes[0].text(title);
+              textNodes[1].text(content);
+              editingNote = null;
+            } else {
+              noteGroup = new Konva.Group({
+                x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+                y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+                draggable: true,
+                name: 'note',
+                id: `note-${Date.now()}`,
+              });
+
+              const bg = new Konva.Rect({
+                width: 200,
+                height: 150,
+                fill: '#fefcbf',
+                stroke: '#d1d5db',
+                strokeWidth: 2,
+                cornerRadius: 8,
+                shadowColor: 'rgba(0,0,0,0.2)',
+                shadowBlur: 10,
+                shadowOffset: { x: 2, y: 2 },
+              });
+
+              const titleText = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: title,
+                fontSize: 16,
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                fill: 'black',
+                width: 180,
+                padding: 5,
+              });
+
+              const contentText = new Konva.Text({
+                x: 10,
+                y: 40,
+                text: content,
+                fontSize: 14,
+                fontFamily: 'Arial',
+                fill: 'black',
+                width: 180,
+                padding: 5,
+              });
+
+              noteGroup.add(bg, titleText, contentText);
+              canvases[role].add(noteGroup);
+
+              noteGroup.on('dblclick', () => {
+                const textNodes = noteGroup.find('.Text');
+                if (textNodes.length < 2) {
+                  console.error('Invalid note:', noteGroup.id(), textNodes.length);
+                  alert('Ошибка: заметка имеет некорректную структуру.');
+                  return;
+                }
+                editingNote = noteGroup;
+                document.getElementById('note-modal').classList.remove('hidden');
+                document.getElementById('note-title').value = textNodes[0].text();
+                document.getElementById('note-content').value = textNodes[1].text();
+                document.getElementById('task-role').value = role;
+              });
+
+              noteGroup.on('transform', () => {
+                bg.width(noteGroup.width() / noteGroup.scaleX());
+                bg.height(noteGroup.height() / noteGroup.scaleY());
+                titleText.width(bg.width() - 20);
+                contentText.width(bg.width() - 20);
+              });
+            }
+
+            if (currentCanvas === role) {
+              stage.getLayers().forEach(layer => {
+                if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
+              });
+              stage.add(canvases[role]);
               stage.batchDraw();
-              lastDist = dist;
             }
-          } else if (e.evt.touches.length === 1 && startPos) {
-            const touch = e.evt.touches[0];
-            stage.position({
-              x: startPos.x + (touch.clientX - startPos.x),
-              y: startPos.y + (touch.clientY - startPos.y)
-            });
-            updateGrid(stage, backgroundLayer);
-            loadVisibleElements();
+            document.getElementById('note-modal').classList.add('hidden');
+            document.getElementById('note-title').value = '';
+            document.getElementById('note-content').value = '';
+            await saveBoard();
+          });
+
+          // Создание комментария
+          let editingComment = null;
+          document.getElementById('create-comment').addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+            document.getElementById('comment-modal').classList.remove('hidden');
+            document.getElementById('comment-author').value = currentUser.displayName || 'Пользователь';
+            document.getElementById('comment-content').value = '';
+            editingComment = null;
+          });
+
+          document.getElementById('cancel-comment').addEventListener('click', () => {
+            document.getElementById('comment-modal').classList.add('hidden');
+            document.getElementById('comment-author').value = '';
+            document.getElementById('comment-content').value = '';
+          });
+
+          document.getElementById('save-comment').addEventListener('click', async () => {
+            const author = document.getElementById('comment-author').value.trim();
+            const content = document.getElementById('comment-content').value.trim();
+            const role = document.getElementById('task-role').value || 'Общий';
+
+            if (!author || !content) {
+              alert('Заполните автора и содержимое');
+              return;
+            }
+
+            const date = new Date().toLocaleString('ru-RU');
+            if (!canvases[role]) {
+              canvases[role] = new Konva.Layer();
+              if (role !== 'Общий' && !roles.includes(role)) {
+                roles.push(role);
+                updateRolesList();
+              }
+            }
+
+            let commentGroup;
+            if (editingComment) {
+              commentGroup = editingComment;
+              const textNodes = commentGroup.find('.Text');
+              if (textNodes.length < 2) {
+                console.error('Invalid comment:', commentGroup.id(), textNodes.length);
+                alert('Ошибка: комментарий имеет некорректную структуру.');
+                return;
+              }
+              textNodes[0].text(`От: ${author} (${date})`);
+              textNodes[1].text(content);
+              editingComment = null;
+            } else {
+              commentGroup = new Konva.Group({
+                x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+                y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+                draggable: true,
+                name: 'comment',
+                id: `comment-${Date.now()}`,
+              });
+
+              const bg = new Konva.Rect({
+                width: 200,
+                height: 150,
+                fill: '#e5e7eb',
+                stroke: '#d1d5db',
+                strokeWidth: 2,
+                cornerRadius: 8,
+                shadowColor: 'rgba(0,0,0,0.2)',
+                shadowBlur: 10,
+                shadowOffset: { x: 0, y: 2 },
+              });
+
+              const authorText = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: `От: ${author} (${date})`,
+                fontSize: 14,
+                fontFamily: 'Arial',
+                fontStyle: 'italic',
+                fill: '#000000',
+                width: 180,
+                padding: 5,
+              });
+
+              const contentText = new Konva.Text({
+                x: 10,
+                y: 40,
+                text: content,
+                fontSize: 14,
+                fontFamily: 'Arial',
+                fill: '#000000',
+                width: 180,
+                padding: 5,
+              });
+
+              commentGroup.add(bg, authorText, contentText);
+              canvases[role].add(commentGroup);
+
+              commentGroup.on('dblclick', () => {
+                const textNodes = commentGroup.find('.Text');
+                if (textNodes.length < 2) {
+                  console.error('Invalid comment:', commentGroup.id(), textNodes.length);
+                  alert('Ошибка: комментарий имеет некорректную структуру.');
+                  return;
+                }
+                editingComment = commentGroup;
+                document.getElementById('comment-modal').classList.remove('hidden');
+                document.getElementById('comment-author').value = authorText.text().replace(/ \(.*\)/, '');
+                document.getElementById('comment-content').value = contentText.text();
+                document.getElementById('task-role').value = role;
+              });
+
+              commentGroup.on('transform', () => {
+                bg.width(commentGroup.width() / commentGroup.scaleX());
+                bg.height(commentGroup.height() / commentGroup.scaleY());
+                authorText.width(bg.width() - 20);
+                contentText.width(bg.width() - 20);
+              });
+            }
+
+            if (currentCanvas === role) {
+              stage.getLayers().forEach(layer => {
+                if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
+              });
+              stage.add(canvases[role]);
+              stage.batchDraw();
+            }
+            document.getElementById('comment-modal').classList.add('hidden');
+            document.getElementById('comment-author').value = '';
+            document.getElementById('comment-content').value = '';
+            await saveBoard();
+          });
+
+          // Создание текста
+          let editingText = null;
+          document.getElementById('create-text').addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+            document.getElementById('text-modal').classList.remove('hidden');
+            document.getElementById('text-content').value = '';
+            editingText = null;
+          });
+
+          document.getElementById('cancel-text').addEventListener('click', () => {
+            document.getElementById('text-modal').classList.add('hidden');
+            document.getElementById('text-content').value = '';
+          });
+
+          document.getElementById('save-text').addEventListener('click', async () => {
+            const content = document.getElementById('text-content').value.trim();
+            const role = document.getElementById('task-role').value || 'Общий';
+
+            if (!content) {
+              alert('Введите текст');
+              return;
+            }
+
+            if (!canvases[role]) {
+              canvases[role] = new Konva.Layer();
+              if (role !== 'Общий' && !roles.includes(role)) {
+                roles.push(role);
+                updateRolesList();
+              }
+            }
+
+            let textGroup;
+            if (editingText) {
+              textGroup = editingText;
+              textGroup.findOne('Text').text(content);
+              editingText = null;
+            } else {
+              textGroup = new Konva.Group({
+                x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+                y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+                draggable: true,
+                name: 'text',
+                id: `text-${Date.now()}`,
+              });
+
+              const bg = new Konva.Rect({
+                width: 200,
+                height: 100,
+                fill: 'transparent',
+                stroke: '#d1d5db',
+                strokeWidth: 1,
+              });
+
+              const contentText = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: content,
+                fontSize: 14,
+                fontFamily: 'Arial',
+                fill: 'white',
+                width: 180,
+                padding: 5,
+              });
+
+              textGroup.add(bg, contentText);
+              canvases[role].add(textGroup);
+
+              textGroup.on('dblclick', () => {
+                const textNodes = textGroup.find('.Text');
+                if (textNodes.length < 1) {
+                  console.error('Invalid text:', textGroup.id(), textNodes.length);
+                  alert('Ошибка: текст имеет некорректную структуру.');
+                  return;
+                }
+                editingText = textGroup;
+                document.getElementById('text-modal').classList.remove('hidden');
+                document.getElementById('text-content').value = contentText.text();
+                document.getElementById('task-role').value = role;
+              });
+
+              textGroup.on('transform', () => {
+                bg.width(textGroup.width() / textGroup.scaleX());
+                bg.height(textGroup.height() / textGroup.scaleY());
+                contentText.width(bg.width() - 20);
+              });
+            }
+
+            if (currentCanvas === role) {
+              stage.getLayers().forEach(layer => {
+                if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
+              });
+              stage.add(canvases[role]);
+              stage.batchDraw();
+            }
+            document.getElementById('text-modal').classList.add('hidden');
+            document.getElementById('text-content').value = '';
+            await saveBoard();
+          });
+
+          // Удаление элемента
+          document.getElementById('delete-element').addEventListener('click', async () => {
+            if (contextTarget) {
+              console.log('Deleting:', contextTarget.id(), contextTarget.name());
+              contextTarget.destroy();
+              transformer.nodes([]);
+              stage.batchDraw();
+              contextMenu.classList.add('hidden');
+              contextTarget = null;
+              await saveBoard();
+            }
+          });
+
+          // Админ-панель
+          const adminPanel = document.getElementById('admin-panel');
+          document.getElementById('toggle-admin').addEventListener('click', () => {
+            const isHidden = adminPanel.classList.contains('hidden');
+            adminPanel.classList.toggle('hidden');
+            if (isHidden) {
+              adminPanel.classList.add('slide-in', 'open');
+            } else {
+              adminPanel.classList.remove('slide-in', 'open');
+            }
+            document.getElementById('sidebar').classList.remove('open');
+          });
+
+          // Генерация ссылки
+          document.getElementById('generate-link').addEventListener('click', () => {
+            const link = `https://app.example.com/invite/${currentBoardId}`;
+            document.getElementById('invite-link').value = link;
+            console.log('Generated invite link:', link);
+          });
+
+          // Добавление роли
+          document.getElementById('add-role').addEventListener('click', async () => {
+            const roleInput = document.getElementById('role-input').value.trim();
+            if (roleInput && !roles.includes(roleInput)) {
+              roles.push(roleInput);
+              canvases[roleInput] = new Konva.Layer();
+              updateRolesList();
+              roleInput.value = '';
+              await saveBoard();
+              console.log('Added role:', roleInput);
+            }
+          });
+
+          // Переключение темы
+          document.getElementById('theme-select').addEventListener('change', e => {
+            document.body.className = e.target.value === 'light' ? 'bg-gray-100 text-black light' : 'bg-gray-900 text-white';
+            console.log('Switched theme to:', e.target.value);
+          });
+
+          // Зум и панорамирование
+          let scale = 1;
+          stage.on('wheel', e => {
+            e.evt.preventDefault();
+            const oldScale = scale;
+            const pointer = stage.getPointerPosition();
+            const mousePointTo = {
+              x: pointer.x / oldScale - stage.x() / oldScale,
+              y: pointer.y / oldScale - stage.y() / oldScale,
+            };
+
+            const deltaY = e.evt.deltaY;
+            scale = deltaY > 0 ? scale * 0.9 : scale / 0.9;
+            scale = Math.max(0.5, Math.min(scale, 3));
+
+            stage.scale({ x: scale, y: scale });
+            const newPos = {
+              x: -(mousePointTo.x - pointer.x / scale) * scale,
+              y: -(mousePointTo.y - pointer.y / scale) * scale,
+            };
+            stage.position(newPos);
+            updateGrid();
             stage.batchDraw();
-          }
-        });
+          });
 
-        stage.on('touchend', () => {
-          lastDist = 0;
-          startPos = null;
-        });
+          // Сенсорное управление
+          let lastDist = 0;
+          let startPos = { x: 0, y: 0 };
+          stage.on('touchstart', e => {
+            if (e.evt.touches.length === 2) {
+              lastDist = Math.hypot(
+                e.evt.touches[0].clientX - e.evt.touches[1].clientX,
+                e.evt.touches[0].clientY - e.evt.touches[1].clientY
+              );
+            } else if (e.evt.ctrlKey || e.evt.touches.length === 1) {
+              startPos = stage.getPointerPosition();
+            }
+          });
 
-        // Drag Pan
-        let isDragging = false;
-        let dragStartPos = { x: 0, y: 0 };
-        stage.on('mousedown touchstart', (e) => {
-          if (e.evt.ctrlKey && e.evt.button === 0 || e.evt.type === 'touchstart') {
-            isDragging = true;
-            dragStartPos = stage.getPointerPosition();
-          }
-        });
+          stage.on('touchmove', e => {
+            if (e.evt.touches.length === 2) {
+              const newDist = Math.hypot(
+                e.evt.touches[0].clientX - e.evt.touches[1].clientX,
+                e.evt.touches[0].clientY - e.evt.touches[1].clientY
+              );
+              if (lastDist > 0) {
+                const oldScale = scale;
+                scale *= newDist / lastDist;
+                scale = Math.max(0.5, Math.min(scale, 3));
+                const pointer = {
+                  x: (e.evt.touches[0].clientX + e.evt.touches[1].clientX) / 2,
+                  y: (e.evt.touches[0].clientY + e.evt.touches[1].clientY) / 2,
+                };
+                const mousePointTo = {
+                  x: pointer.x / oldScale - stage.x() / oldScale,
+                  y: pointer.y / oldScale - stage.y() / oldScale,
+                };
+                stage.scale({ x: scale, y: scale });
+                const newPos = {
+                  x: -(mousePointTo.x - pointer.x / scale) * scale,
+                  y: -(mousePointTo.y - pointer.y / scale) * scale,
+                };
+                stage.position(newPos);
+                lastDist = newDist;
+                updateGrid();
+                stage.batchDraw();
+              }
+            } else if (e.evt.ctrlKey || e.evt.touches.length === 1) {
+              const pos = stage.getPointerPosition();
+              stage.position({
+                x: stage.x() + pos.x - startPos.x,
+                y: stage.y() + pos.y - startPos.y,
+              });
+              startPos = pos;
+              updateGrid();
+              stage.batchDraw();
+            }
+          });
 
-        stage.on('mousemove touchmove', (e) => {
-          if (isDragging) {
-            const pos = stage.getPointerPosition();
-            const dx = pos.x - dragStartPos.x;
-            const dy = pos.y - dragStartPos.y;
-            stage.position({
-              x: stage.x() + dx,
-              y: stage.y() + dy
-            });
-            updateGrid(stage, backgroundLayer);
-            loadVisibleElements();
+          stage.on('touchend', () => {
+            lastDist = 0;
+          });
+
+          // Кнопка-гамбургер
+          document.getElementById('hamburger-menu').addEventListener('click', () => {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
+            adminPanel.classList.add('hidden', 'open');
+          });
+
+          // Изменение размера окна
+          window.addEventListener('resize', () => {
+            stage.width(window.innerWidth - (window.innerWidth <= 768 ? 0 : 256));
+            stage.height(window.innerHeight);
+            updateGrid();
             stage.batchDraw();
-            dragStartPos = pos;
-          }
-        });
-
-        stage.on('mouseup touchend', () => {
-          isDragging = false;
-        });
-
-        // Resize Window
-        window.addEventListener('resize', () => {
-          stage.width(window.innerWidth - (window.innerWidth < 768 ? 0 : 256));
-          stage.height(window.innerHeight - (window.innerWidth < 600 ? 48 : 0));
-          updateGrid(stage, backgroundLayer);
-          stage.batchDraw();
-        });
-      } catch (error) {
-        console.error('Error setting up event listeners:', error);
-      }
-    }
-
-    // Get Group Ancestor
-    function getGroupAncestor(node) {
-      let currentNode = node;
-      while (currentNode && currentNode.getType() !== 'Stage') {
-        if (currentNode.hasName('task') || currentNode.hasName('pdf') || currentNode.hasName('note') || currentNode.hasName('comment') || currentNode.hasName('text')) {
-          return currentNode;
+            console.log('Resized canvas');
+          });
         }
-        currentNode = currentNode.getParent();
-      }
-      return null;
-    }
-
-    // Edit Element
-    function editElement(group, type) {
-      if (!isEditable(group.attrs.role)) return;
-
-      if (type === 'task') {
-        editingTask = group;
-        document.getElementById('task-modal').style.display = 'flex';
-        document.getElementById('task-title').value = group.find('Text')[0].text();
-        document.getElementById('task-desc').value = group.find('Text')[1].text();
-        document.getElementById('task-status').value = group.find('Text')[2].text().replace('Status: ', '');
-      } else if (type === 'pdf') {
-        editingTask = group;
-        document.getElementById('pdf-modal').style.display = 'flex';
-        document.getElementById('pdf-content').value = group.find('Text')[0].text();
-      } else if (type === 'note') {
-        editingTask = group;
-        document.getElementById('note-modal').style.display = 'flex';
-        document.getElementById('note-title').value = group.find('Text')[0].text();
-        document.getElementById('note-content').value = group.find('Text')[1].text();
-      } else if (type === 'comment') {
-        editingTask = group;
-        document.getElementById('comment-modal').style.display = 'flex';
-        document.getElementById('comment-author').value = group.find('Text')[0].text().split(' ')[1];
-        document.getElementById('comment-content').value = group.find('Text')[1].text();
-      } else if (type === 'text') {
-        editingTask = group;
-        document.getElementById('text-modal').style.display = 'flex';
-        document.getElementById('text-content').value = group.find('Text')[0].text();
-      }
-    }
-
-    // Update Element Size
-    async function updateElementSize(group, elementId) {
-      try {
-        const newWidth = group.width() * group.scaleX();
-        const newHeight = group.height() * group.scaleY();
-        group.setAttrs({
-          width: newWidth,
-          height: newHeight,
-          scaleX: 1,
-          scaleY: 1
-        });
-
-        const bg = group.find('Rect')[0];
-        bg.setAttrs({ width: newWidth, height: newHeight });
-
-        const texts = group.find('Text');
-        texts.forEach((text, i) => {
-          text.width(newWidth - 16);
-          if (group.hasName('task') && i === 2) {
-            text.y(newHeight - 24);
-          }
-        });
-
-        await db.collection(`boards/${currentBoardId}/elements`).doc(elementId).update({
-          width: newWidth,
-          height: newHeight
-        });
-
-        stage.batchDraw();
-        console.log(`${group.name()} resized: width=${newWidth}, height=${newHeight}`);
       } catch (error) {
-        console.error('Error updating size:', error);
+        console.error('Initialization error:', error);
+        alert('Ошибка инициализации приложения. Проверьте консоль браузера.');
       }
-    }
-
-    // Update Element Data
-    async function updateElementData(group, elementId) {
-      try {
-        await db.collection(`boards/${currentBoardId}/elements`).doc(elementId).update({
-          x: group.x(),
-          y: group.y()
-        });
-        stage.batchDraw();
-        console.log(`Element ${elementId} moved`);
-      } catch (error) {
-        console.error('Error updating position:', error);
-      }
-    }
+    };
   </script>
 </body>
 </html>
