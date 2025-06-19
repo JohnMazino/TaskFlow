@@ -26,36 +26,36 @@
     .fade-in { animation: fade-in 0.3s ease-out; }
     .card-hover:hover { transform: scale(1.02); transition: transform 0.2s ease; }
     body { background-color: #1f2937; color: #ffffff; }
-    #admin-panel, #auth-modal, #board-modal { z-index: 30; }
+    #admin-panel, #auth-modal { z-index: 30; }
     #canvas-container { position: relative; overflow: hidden; }
+    #sidebar-toggle { position: absolute; top: 10px; left: 10px; z-index: 40; }
     @media (max-width: 768px) {
-      #sidebar { width: 80%; height: 100%; position: fixed; top: 0; left: -80%; transition: transform 0.3s ease; z-index: 40; }
-      #sidebar.open { transform: translateX(0); }
+      #sidebar { width: 256px; height: 100%; position: fixed; top: 0; left: -256px; transition: left 0.3s ease; z-index: 40; }
+      #sidebar.open { left: 0; }
       #admin-panel { width: 80%; transform: translateX(100%); transition: transform 0.3s ease; }
       #admin-panel.open { transform: translateX(0); }
       #canvas-container { width: 100%; }
       .modal-content { width: 90%; max-width: 400px; }
-      #hamburger-menu { display: block; }
       #context-menu { width: 150px; font-size: 14px; }
       input, textarea, select { font-size: 14px; }
     }
     @media (min-width: 769px) {
-      #sidebar { width: 256px; position: static; transform: none; }
+      #sidebar { width: 256px; position: fixed; left: -256px; transition: left 0.3s ease; }
+      #sidebar.open { left: 0; }
       #admin-panel { width: 320px; transform: none; }
-      #hamburger-menu { display: none; }
+      #sidebar-toggle { display: block; }
     }
   </style>
 </head>
 <body class="flex h-screen overflow-hidden">
-  <!-- Кнопка-гамбургер -->
-  <button id="hamburger-menu" class="fixed top-4 left-4 z-50 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 md:hidden">
+  <!-- Кнопка переключения боковой панели -->
+  <button id="sidebar-toggle" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
     ☰
   </button>
 
   <!-- Боковая панель -->
-  <div id="sidebar" class="w-64 bg-gray-800 p-4 flex flex-col">
-    <h2 class="text-xl font-bold mb-4">Доски и роли</h2>
-    <div id="boards-list" class="mb-4"></div>
+  <div id="sidebar" class="bg-gray-800 p-4 flex flex-col">
+    <h2 class="text-xl font-bold mb-4">Роли</h2>
     <ul id="roles-list" class="space-y-2 flex-1"></ul>
     <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition hidden">Админ-панель</button>
     <button id="logout" class="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">Выйти</button>
@@ -105,24 +105,6 @@
         </div>
         <div id="auth-error" class="text-red-500 text-sm hidden"></div>
       </div>
-    </div>
-  </div>
-
-  <!-- Модальное окно выбора доски -->
-  <div id="board-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
-    <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
-      <h3 class="text-lg font-bold mb-4">Управление досками</h3>
-      <div class="mb-4">
-        <label class="block text-sm font-medium">Название новой доски</label>
-        <input id="board-name-input" type="text" placeholder="Введите название" class="w-full bg-gray-700 p-2 rounded mb-2">
-        <button id="create-board" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full">Создать</button>
-      </div>
-      <div class="mb-4">
-        <label class="block text-sm font-medium">Присоединиться по ссылке</label>
-        <input id="join-link" type="text" placeholder="Вставьте ссылку" class="w-full bg-gray-700 p-2 rounded mb-2">
-        <button id="join-board" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full">Присоединиться</button>
-      </div>
-      <button id="back-to-boards" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 w-full">Вернуться к доскам</button>
     </div>
   </div>
 
@@ -225,7 +207,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
-    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, query, where, getDocs, arrayUnion, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, setDoc, arrayUnion, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAdPjUWf2gkcZxOAkQb-3hkjKtuETOVRhc",
@@ -246,7 +228,6 @@
     let unsubscribeBoardSnapshot = null;
 
     window.onload = async function() {
-      console.log('DOM loaded, initializing app...');
       try {
         if (!window.Konva) throw new Error('Konva.js not loaded');
         if (!window.jspdf) throw new Error('jsPDF not loaded');
@@ -259,7 +240,7 @@
         const emailInput = document.getElementById('email-input');
         const passwordInput = document.getElementById('password-input');
         const sidebar = document.getElementById('sidebar');
-        const hamburgerMenu = document.getElementById('hamburger-menu');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
 
         function toggleAuthModeUI() {
           isSignInMode = !isSignInMode;
@@ -287,10 +268,12 @@
           try {
             if (isSignInMode) {
               await signInWithEmailAndPassword(auth, email, password);
-              console.log('User signed in with email:', email);
             } else {
-              await createUserWithEmailAndPassword(auth, email, password);
-              console.log('User registered with email:', email);
+              const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+              await setDoc(doc(db, 'users', userCredential.user.uid), {
+                email: email,
+                displayName: email.split('@')[0]
+              });
             }
           } catch (error) {
             let errorMessage = 'Произошла ошибка';
@@ -308,28 +291,30 @@
           }
         });
 
-        onAuthStateChanged(auth, function(user) {
+        onAuthStateChanged(auth, async function(user) {
           if (user) {
             currentUser = user;
             authModal.classList.add('hidden');
-            document.getElementById('board-modal').classList.remove('hidden');
+            document.getElementById('canvas-container').classList.remove('hidden');
+            sidebar.classList.add('open');
             document.getElementById('comment-author').value = user.displayName || user.email || 'Пользователь';
-            loadUserBoards();
-            console.log('User signed in:', user.email || user.displayName);
+            await loadUserBoard();
           } else {
             authModal.classList.remove('hidden');
-            document.getElementById('board-modal').classList.add('hidden');
             document.getElementById('canvas-container').classList.add('hidden');
-            sidebar.classList.add('hidden');
+            sidebar.classList.remove('open');
             if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
-            console.log('No user signed in');
           }
         });
 
         document.getElementById('google-signin').addEventListener('click', async function() {
           try {
             const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
+            const result = await signInWithPopup(auth, provider);
+            await setDoc(doc(db, 'users', result.user.uid), {
+              email: result.user.email,
+              displayName: result.user.displayName || result.user.email.split('@')[0]
+            }, { merge: true });
           } catch (error) {
             authError.textContent = error.message;
             authError.classList.remove('hidden');
@@ -340,7 +325,6 @@
         document.getElementById('logout').addEventListener('click', async function() {
           try {
             await signOut(auth);
-            console.log('User signed out');
             currentBoardId = null;
             sidebar.classList.remove('open');
             if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
@@ -349,129 +333,63 @@
           }
         });
 
-        hamburgerMenu.addEventListener('click', function() {
+        sidebarToggle.addEventListener('click', function() {
           if (sidebar.classList.contains('open')) {
-            sidebar.classList.remove('open', 'slide-in');
-            sidebar.classList.add('slide-out');
-            setTimeout(function() { sidebar.classList.remove('slide-out'); }, 300);
+            sidebar.classList.remove('open');
+            sidebar.style.left = '-256px';
           } else {
-            sidebar.classList.add('open', 'slide-in');
+            sidebar.classList.add('open');
+            sidebar.style.left = '0';
             document.getElementById('admin-panel').classList.remove('open', 'slide-in');
           }
         });
 
-        document.getElementById('create-board').addEventListener('click', async function() {
-          const boardName = document.getElementById('board-name-input').value.trim();
-          if (!boardName) {
-            alert('Введите название доски');
-            return;
-          }
+        async function loadUserBoard() {
           try {
-            if (!currentUser) throw new Error('Пользователь не аутентифицирован');
-            const boardRef = await addDoc(collection(db, 'boards'), {
-              name: boardName,
-              owner: currentUser.uid,
-              users: [currentUser.uid],
-              roleAssignments: {},
-              canvases: { 'Общий': [] }
-            });
-            currentBoardId = boardRef.id;
-            document.getElementById('board-modal').classList.add('hidden');
-            document.getElementById('canvas-container').classList.remove('hidden');
-            sidebar.classList.remove('hidden');
-            await initBoard();
-            console.log('Created board:', currentBoardId);
-          } catch (error) {
-            console.error('Error creating board:', error);
-            alert('Ошибка создания доски: ' + error.message);
-          }
-        });
-
-        document.getElementById('join-board').addEventListener('click', async function() {
-          try {
-            const link = document.getElementById('join-link').value.trim();
-            const boardId = link.split('/').pop();
-            const boardDoc = await getDoc(doc(db, 'boards', boardId));
-            if (boardDoc.exists()) {
-              await updateDoc(doc(db, 'boards', boardId), {
-                users: arrayUnion(currentUser.uid)
+            const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+            let boardId = userDoc.exists() && userDoc.data().boardId;
+            if (!boardId) {
+              const boardRef = await addDoc(collection(db, 'boards'), {
+                name: `Доска ${currentUser.email}`,
+                owner: currentUser.uid,
+                users: [currentUser.uid],
+                roleAssignments: {},
+                canvases: { 'Общий': [] }
               });
-              currentBoardId = boardId;
-              document.getElementById('board-modal').classList.add('hidden');
-              document.getElementById('canvas-container').classList.remove('hidden');
-              sidebar.classList.remove('hidden');
-              await initBoard();
-              console.log('Joined board:', boardId);
-            } else {
-              alert('Доска не найдена');
+              boardId = boardRef.id;
+              await updateDoc(doc(db, 'users', currentUser.uid), { boardId });
             }
+            currentBoardId = boardId;
+            await initBoard();
           } catch (error) {
-            console.error('Error joining board:', error);
-            alert('Ошибка присоединения к доске: ' + error.message);
-          }
-        });
-
-        document.getElementById('back-to-boards').addEventListener('click', function() {
-          document.getElementById('canvas-container').classList.add('hidden');
-          document.getElementById('sidebar').classList.add('hidden');
-          document.getElementById('board-modal').classList.remove('hidden');
-          if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
-          currentBoardId = null;
-          loadUserBoards();
-        });
-
-        async function loadUserBoards() {
-          try {
-            const boardsList = document.getElementById('boards-list');
-            boardsList.innerHTML = '';
-            const q = query(collection(db, 'boards'), where('users', 'array-contains', currentUser.uid));
-            const querySnapshot = await getDocs(q);
-            querySnapshot.forEach(function(doc) {
-              const board = doc.data();
-              const div = document.createElement('div');
-              div.className = `p-2 rounded cursor-pointer transition ${doc.id === currentBoardId ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} fade-in`;
-              div.textContent = board.name;
-              div.addEventListener('click', async function() {
-                currentBoardId = doc.id;
-                document.getElementById('board-modal').classList.add('hidden');
-                document.getElementById('canvas-container').classList.remove('hidden');
-                sidebar.classList.remove('hidden');
-                await initBoard();
-                loadUserBoards();
-              });
-              boardsList.appendChild(div);
-            });
-            console.log('Loaded user boards');
-          } catch (error) {
-            console.error('Error loading boards:', error);
-            alert('Ошибка загрузки досок: ' + error.message);
+            console.error('Error loading board:', error);
+            alert('Ошибка загрузки доски: ' + error.message);
           }
         }
 
-async function loadBoardUsers() {
-  const userSelect = document.getElementById('user-select');
-  userSelect.innerHTML = '<option value="">Выберите пользователя</option>';
-  const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
-  if (boardDoc.exists()) {
-    const users = boardDoc.data().users || [];
-    for (const uid of users) {
-      // Вместо auth.getUser используем Firestore для получения данных пользователя
-      const userDoc = await getDoc(doc(db, 'users', uid)).catch(() => null);
-      const userData = userDoc?.exists() ? userDoc.data() : null;
-      const displayName = userData?.displayName || userData?.email || uid;
-      const option = document.createElement('option');
-      option.value = uid;
-      option.textContent = displayName;
-      userSelect.appendChild(option);
-    }
-  }
-}
+        async function loadBoardUsers() {
+          const userSelect = document.getElementById('user-select');
+          userSelect.innerHTML = '<option value="">Выберите пользователя</option>';
+          const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+          if (boardDoc.exists()) {
+            const users = boardDoc.data().users || [];
+            for (const uid of users) {
+              const userDoc = await getDoc(doc(db, 'users', uid)).catch(() => null);
+              const userData = userDoc?.exists() ? userDoc.data() : null;
+              const displayName = userData?.displayName || userData?.email || uid;
+              const option = document.createElement('option');
+              option.value = uid;
+              option.textContent = displayName;
+              userSelect.appendChild(option);
+            }
+          }
+        }
 
         async function initBoard() {
           if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
           const stage = new Konva.Stage({
             container: 'canvas-container',
-            width: window.innerWidth - (window.innerWidth <= 768 ? 0 : 256),
+            width: window.innerWidth,
             height: window.innerHeight,
           });
 
@@ -568,90 +486,202 @@ async function loadBoardUsers() {
               }
             });
             updateRolesList();
-            console.log('Board updated in real-time:', currentBoardId);
           });
 
           function createGroupFromData(data) {
             const group = new Konva.Group({
-              x: data.x,
-              y: data.y,
+              x: data.x || 0,
+              y: data.y || 0,
               draggable: true,
               name: data.type,
               id: data.id,
+              scaleX: data.scaleX || 1,
+              scaleY: data.scaleY || 1,
             });
 
-            const bg = new Konva.Rect(data.bg);
+            const bgAttrs = {
+              width: data.bg?.width || 200,
+              height: data.bg?.height || (data.type === 'pdf' ? 400 : 150),
+              fill: data.bg?.fill || (data.type === 'pdf' ? '#f8f8f8' : data.type === 'note' ? '#fefcbf' : data.type === 'comment' ? '#e5e7eb' : data.type === 'text' ? 'transparent' : '#ffffff'),
+              stroke: data.bg?.stroke || '#d1d5db',
+              strokeWidth: data.bg?.strokeWidth || (data.type === 'text' ? 1 : 2),
+              cornerRadius: data.bg?.cornerRadius || 8,
+              shadowColor: data.bg?.shadowColor || 'rgba(0,0,0,0.2)',
+              shadowBlur: data.bg?.shadowBlur || 10,
+              shadowOffset: data.bg?.shadowOffset || (data.type === 'comment' ? { x: 0, y: 2 } : { x: 2, y: 2 }),
+            };
+
+            const bg = new Konva.Rect(bgAttrs);
             let textNodes = [];
+
             if (data.type === 'task') {
-              textNodes = [
-                new Konva.Text(data.texts.title),
-                new Konva.Text(data.texts.desc),
-                new Konva.Text(data.texts.status),
-              ];
+              const titleText = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: data.texts?.title?.text || '',
+                fontSize: data.texts?.title?.fontSize || 16,
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                fill: 'black',
+                width: bgAttrs.width - 20,
+                padding: 5,
+              });
+
+              const descText = new Konva.Text({
+                x: 10,
+                y: 40,
+                text: data.texts?.desc?.text || '',
+                fontSize: data.texts?.desc?.fontSize || 14,
+                fontFamily: 'Arial',
+                fill: 'black',
+                width: bgAttrs.width - 20,
+                padding: 5,
+              });
+
+              const statusText = new Konva.Text({
+                x: 10,
+                y: bgAttrs.height - 30,
+                text: data.texts?.status?.text || 'Статус: К выполнению',
+                fontSize: data.texts?.status?.fontSize || 14,
+                fontFamily: 'Arial',
+                fill: data.texts?.status?.fill || '#ef4444',
+                width: bgAttrs.width - 20,
+                padding: 5,
+              });
+
+              textNodes = [titleText, descText, statusText];
               group.on('dblclick', function() {
-                if (group.name() !== 'task') return;
-                const texts = group.find('.Text');
-                if (texts.length < 3) {
-                  console.error('Invalid task card:', group.id(), texts.length);
-                  alert('Ошибка: задача имеет некорректную структуру.');
-                  return;
-                }
                 editingTask = group;
                 document.getElementById('task-modal').classList.remove('hidden');
-                document.getElementById('task-title').value = texts[0].text();
-                document.getElementById('task-desc').value = texts[1].text();
-                document.getElementById('task-status').value = texts[2].text().replace('Статус: ', '');
-                document.getElementById('task-role').value = data.role;
+                document.getElementById('task-title').value = titleText.text();
+                document.getElementById('task-desc').value = descText.text();
+                document.getElementById('task-status').value = statusText.text().replace('Статус: ', '');
+                document.getElementById('task-role').value = data.role || 'Общий';
               });
             } else if (data.type === 'pdf') {
-              textNodes = [new Konva.Text(data.texts.content)];
+              const contentText = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: data.texts?.content?.text || '',
+                fontSize: data.texts?.content?.fontSize || 14,
+                fontFamily: 'Arial',
+                fill: 'black',
+                width: bgAttrs.width - 20,
+                padding: 5,
+              });
+
+              textNodes = [contentText];
               group.on('dblclick', function() {
                 editingPdf = group;
                 document.getElementById('pdf-modal').classList.remove('hidden');
-                document.getElementById('pdf-content').value = textNodes[0].text();
-                document.getElementById('task-role').value = data.role;
+                document.getElementById('pdf-content').value = contentText.text();
+                document.getElementById('task-role').value = data.role || 'Общий';
               });
               group.on('dragend', handlePdfDragEnd);
             } else if (data.type === 'note') {
-              textNodes = [
-                new Konva.Text(data.texts.title),
-                new Konva.Text(data.texts.content),
-              ];
+              const titleText = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: data.texts?.title?.text || '',
+                fontSize: data.texts?.title?.fontSize || 16,
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                fill: 'black',
+                width: bgAttrs.width - 20,
+                padding: 5,
+              });
+
+              const contentText = new Konva.Text({
+                x: 10,
+                y: 40,
+                text: data.texts?.content?.text || '',
+                fontSize: data.texts?.content?.fontSize || 14,
+                fontFamily: 'Arial',
+                fill: 'black',
+                width: bgAttrs.width - 20,
+                padding: 5,
+              });
+
+              textNodes = [titleText, contentText];
               group.on('dblclick', function() {
                 editingNote = group;
                 document.getElementById('note-modal').classList.remove('hidden');
-                document.getElementById('note-title').value = textNodes[0].text();
-                document.getElementById('note-content').value = textNodes[1].text();
-                document.getElementById('task-role').value = data.role;
+                document.getElementById('note-title').value = titleText.text();
+                document.getElementById('note-content').value = contentText.text();
+                document.getElementById('task-role').value = data.role || 'Общий';
               });
             } else if (data.type === 'comment') {
-              textNodes = [
-                new Konva.Text(data.texts.author),
-                new Konva.Text(data.texts.content),
-              ];
+              const authorText = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: data.texts?.author?.text || '',
+                fontSize: data.texts?.author?.fontSize || 14,
+                fontFamily: 'Arial',
+                fontStyle: 'italic',
+                fill: '#000000',
+                width: bgAttrs.width - 20,
+                padding: 5,
+              });
+
+              const contentText = new Konva.Text({
+                x: 10,
+                y: 40,
+                text: data.texts?.content?.text || '',
+                fontSize: data.texts?.content?.fontSize || 14,
+                fontFamily: 'Arial',
+                fill: '#000000',
+                width: bgAttrs.width - 20,
+                padding: 5,
+              });
+
+              textNodes = [authorText, contentText];
               group.on('dblclick', function() {
                 editingComment = group;
                 document.getElementById('comment-modal').classList.remove('hidden');
-                document.getElementById('comment-author').value = textNodes[0].text().replace(/ \(.*\)/, '');
-                document.getElementById('comment-content').value = textNodes[1].text();
-                document.getElementById('task-role').value = data.role;
+                document.getElementById('comment-author').value = authorText.text().replace(/ \(.*\)/, '');
+                document.getElementById('comment-content').value = contentText.text();
+                document.getElementById('task-role').value = data.role || 'Общий';
               });
             } else if (data.type === 'text') {
-              textNodes = [new Konva.Text(data.texts.content)];
+              const contentText = new Konva.Text({
+                x: 10,
+                y: 10,
+                text: data.texts?.content?.text || '',
+                fontSize: data.texts?.content?.fontSize || 14,
+                fontFamily: 'Arial',
+                fill: 'white',
+                width: bgAttrs.width - 20,
+                padding: 5,
+              });
+
+              textNodes = [contentText];
               group.on('dblclick', function() {
                 editingText = group;
                 document.getElementById('text-modal').classList.remove('hidden');
-                document.getElementById('text-content').value = textNodes[0].text();
-                document.getElementById('task-role').value = data.role;
+                document.getElementById('text-content').value = contentText.text();
+                document.getElementById('task-role').value = data.role || 'Общий';
               });
             }
 
             group.add(bg, ...textNodes);
             group.on('transform', function() {
-              bg.width(group.width() / group.scaleX());
-              bg.height(group.height() / group.scaleY());
-              textNodes.forEach(function(text) { text.width(bg.width() - 20); });
-              if (data.type === 'task') textNodes[2].y(bg.height() - 30);
+              const scaleX = group.scaleX();
+              const scaleY = group.scaleY();
+              bg.width((group.width() / scaleX) || bgAttrs.width);
+              bg.height((group.height() / scaleY) || bgAttrs.height);
+              textNodes.forEach(function(text, index) {
+                text.width(bg.width() - 20);
+                if (data.type === 'task' && index === 2) {
+                  text.y(bg.height() - 30);
+                } else if (data.type === 'note' && index === 1) {
+                  text.y(40);
+                } else if (data.type === 'comment' && index === 1) {
+                  text.y(40);
+                }
+              });
+              group.scaleX(1);
+              group.scaleY(1);
+              saveBoard();
             });
             group.on('dragend', saveBoard);
             return group;
@@ -674,7 +704,6 @@ async function loadBoardUsers() {
                 stage.add(canvases[role]);
                 stage.batchDraw();
                 updateRolesList();
-                console.log(`Switched to canvas: ${role}`);
               });
               rolesList.appendChild(li);
             });
@@ -697,48 +726,47 @@ async function loadBoardUsers() {
             const canvasData = {};
             Object.keys(canvases).forEach(function(role) {
               canvasData[role] = canvases[role].find('.Group').map(function(group) {
+                const bg = group.findOne('Rect');
+                const texts = group.find('.Text');
                 return {
                   id: group.id(),
                   type: group.name(),
                   x: group.x(),
                   y: group.y(),
                   role: role,
-                  bg: group.findOne('Rect').attrs,
+                  scaleX: group.scaleX(),
+                  scaleY: group.scaleY(),
+                  bg: {
+                    width: bg.width(),
+                    height: bg.height(),
+                    fill: bg.fill(),
+                    stroke: bg.stroke(),
+                    strokeWidth: bg.strokeWidth(),
+                    cornerRadius: bg.cornerRadius(),
+                    shadowColor: bg.shadowColor(),
+                    shadowBlur: bg.shadowBlur(),
+                    shadowOffset: bg.shadowOffset(),
+                  },
                   texts: group.name() === 'task' ? {
-                    title: group.find('.Text')[0].attrs,
-                    desc: group.find('.Text')[1].attrs,
-                    status: group.find('.Text')[2].attrs,
+                    title: { text: texts[0]?.text(), fontSize: texts[0]?.fontSize(), width: texts[0]?.width() },
+                    desc: { text: texts[1]?.text(), fontSize: texts[1]?.fontSize(), width: texts[1]?.width() },
+                    status: { text: texts[2]?.text(), fontSize: texts[2]?.fontSize(), fill: texts[2]?.fill(), width: texts[2]?.width() },
                   } : group.name() === 'pdf' ? {
-                    content: group.findOne('Text').attrs,
+                    content: { text: texts[0]?.text(), fontSize: texts[0]?.fontSize(), width: texts[0]?.width() },
                   } : group.name() === 'note' ? {
-                    title: group.find('.Text')[0].attrs,
-                    content: group.find('.Text')[1].attrs,
+                    title: { text: texts[0]?.text(), fontSize: texts[0]?.fontSize(), width: texts[0]?.width() },
+                    content: { text: texts[1]?.text(), fontSize: texts[1]?.fontSize(), width: texts[1]?.width() },
                   } : group.name() === 'comment' ? {
-                    author: group.find('.Text')[0].attrs,
-                    content: group.find('.Text')[1].attrs,
-                  } : { content: group.findOne('Text').attrs },
+                    author: { text: texts[0]?.text(), fontSize: texts[0]?.fontSize(), width: texts[0]?.width() },
+                    content: { text: texts[1]?.text(), fontSize: texts[1]?.fontSize(), width: texts[1]?.width() },
+                  } : {
+                    content: { text: texts[0]?.text(), fontSize: texts[0]?.fontSize(), width: texts[0]?.width() },
+                  },
                 };
               });
             });
 
-            const boardDocRef = doc(db, 'boards', currentBoardId);
-            const boardDoc = await getDoc(boardDocRef);
-            if (!boardDoc.exists()) {
-              console.error('Board does not exist:', currentBoardId);
-              alert('Доска не найдена');
-              return;
-            }
-
-            const isOwner = boardDoc.data().owner === currentUser.uid;
-            const assignedUser = roleAssignments[currentCanvas];
-
-            if (currentCanvas !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
-              console.error('Permission denied: User cannot edit this canvas', { canvas: currentCanvas, user: currentUser.uid });
-              alert('У вас нет прав для редактирования этого холста');
-              return;
-            }
-
-            await updateDoc(boardDocRef, {
+            await updateDoc(doc(db, 'boards', currentBoardId), {
               canvases: canvasData,
               roleAssignments: roleAssignments,
             });
@@ -761,7 +789,6 @@ async function loadBoardUsers() {
               const assignedUser = roleAssignments[currentCanvas];
 
               if (currentCanvas !== 'Общий' && !isOwner && assignedUser !== currentUser.uid) {
-                console.log('Context menu blocked: User lacks permission for canvas', currentCanvas);
                 return;
               }
 
@@ -862,11 +889,6 @@ async function loadBoardUsers() {
             if (editingTask) {
               card = editingTask;
               const textNodes = card.find('.Text');
-              if (textNodes.length < 3) {
-                console.error('Invalid task card:', card.id(), textNodes.length);
-                alert('Ошибка: задача имеет некорректную структуру.');
-                return;
-              }
               textNodes[0].text(title);
               textNodes[1].text(desc);
               textNodes[2].text(`Статус: ${status}`);
@@ -931,28 +953,26 @@ async function loadBoardUsers() {
               canvases[role].add(card);
 
               card.on('dblclick', function() {
-                if (card.name() !== 'task') return;
-                const textNodes = card.find('.Text');
-                if (textNodes.length < 3) {
-                  console.error('Invalid task card:', card.id(), textNodes.length);
-                  alert('Ошибка: задача имеет некорректную структуру.');
-                  return;
-                }
                 editingTask = card;
                 document.getElementById('task-modal').classList.remove('hidden');
-                document.getElementById('task-title').value = textNodes[0].text();
-                document.getElementById('task-desc').value = textNodes[1].text();
-                document.getElementById('task-status').value = textNodes[2].text().replace('Статус: ', '');
+                document.getElementById('task-title').value = titleText.text();
+                document.getElementById('task-desc').value = descText.text();
+                document.getElementById('task-status').value = statusText.text().replace('Статус: ', '');
                 document.getElementById('task-role').value = role;
               });
 
               card.on('transform', function() {
-                bg.width(card.width() / card.scaleX());
-                bg.height(card.height() / card.scaleY());
+                const scaleX = card.scaleX();
+                const scaleY = card.scaleY();
+                bg.width(card.width() / scaleX);
+                bg.height(card.height() / scaleY);
                 titleText.width(bg.width() - 20);
                 descText.width(bg.width() - 20);
                 statusText.width(bg.width() - 20);
                 statusText.y(bg.height() - 30);
+                card.scaleX(1);
+                card.scaleY(1);
+                saveBoard();
               });
               card.on('dragend', saveBoard);
             }
@@ -994,11 +1014,7 @@ async function loadBoardUsers() {
                 taskPos.y >= pdfPos.y &&
                 taskPos.y <= pdfPos.y + pdfSize.height
               ) {
-                console.log('Moving task to PDF:', task.id());
                 task.moveTo(this);
-                if (task.find('.Text').length < 3) {
-                  console.error('Corrupted task after move:', task.id());
-                }
               }
             });
             stage.batchDraw();
@@ -1076,9 +1092,14 @@ async function loadBoardUsers() {
 
               pdfGroup.on('dragend', handlePdfDragEnd);
               pdfGroup.on('transform', function() {
-                bg.width(pdfGroup.width() / pdfGroup.scaleX());
-                bg.height(pdfGroup.height() / pdfGroup.scaleY());
+                const scaleX = pdfGroup.scaleX();
+                const scaleY = pdfGroup.scaleY();
+                bg.width(pdfGroup.width() / scaleX);
+                bg.height(pdfGroup.height() / scaleY);
                 text.width(bg.width() - 20);
+                pdfGroup.scaleX(1);
+                pdfGroup.scaleY(1);
+                saveBoard();
               });
             }
 
@@ -1136,11 +1157,6 @@ async function loadBoardUsers() {
             if (editingNote) {
               noteGroup = editingNote;
               const textNodes = noteGroup.find('.Text');
-              if (textNodes.length < 2) {
-                console.error('Invalid note:', noteGroup.id(), textNodes.length);
-                alert('Ошибка: заметка имеет некорректную структуру.');
-                return;
-              }
               textNodes[0].text(title);
               textNodes[1].text(content);
               editingNote = null;
@@ -1192,24 +1208,23 @@ async function loadBoardUsers() {
               canvases[role].add(noteGroup);
 
               noteGroup.on('dblclick', function() {
-                const textNodes = noteGroup.find('.Text');
-                if (textNodes.length < 2) {
-                  console.error('Invalid note:', noteGroup.id(), textNodes.length);
-                  alert('Ошибка: заметка имеет некорректную структуру.');
-                  return;
-                }
                 editingNote = noteGroup;
                 document.getElementById('note-modal').classList.remove('hidden');
-                document.getElementById('note-title').value = textNodes[0].text();
-                document.getElementById('note-content').value = textNodes[1].text();
+                document.getElementById('note-title').value = titleText.text();
+                document.getElementById('note-content').value = contentText.text();
                 document.getElementById('task-role').value = role;
               });
 
               noteGroup.on('transform', function() {
-                bg.width(noteGroup.width() / noteGroup.scaleX());
-                bg.height(noteGroup.height() / noteGroup.scaleY());
+                const scaleX = noteGroup.scaleX();
+                const scaleY = noteGroup.scaleY();
+                bg.width(noteGroup.width() / scaleX);
+                bg.height(noteGroup.height() / scaleY);
                 titleText.width(bg.width() - 20);
                 contentText.width(bg.width() - 20);
+                noteGroup.scaleX(1);
+                noteGroup.scaleY(1);
+                saveBoard();
               });
               noteGroup.on('dragend', saveBoard);
             }
@@ -1270,11 +1285,6 @@ async function loadBoardUsers() {
             if (editingComment) {
               commentGroup = editingComment;
               const textNodes = commentGroup.find('.Text');
-              if (textNodes.length < 2) {
-                console.error('Invalid comment:', commentGroup.id(), textNodes.length);
-                alert('Ошибка: комментарий имеет некорректную структуру.');
-                return;
-              }
               textNodes[0].text(`От: ${author} (${date})`);
               textNodes[1].text(content);
               editingComment = null;
@@ -1326,12 +1336,6 @@ async function loadBoardUsers() {
               canvases[role].add(commentGroup);
 
               commentGroup.on('dblclick', function() {
-                const textNodes = commentGroup.find('.Text');
-                if (textNodes.length < 2) {
-                  console.error('Invalid comment:', commentGroup.id(), textNodes.length);
-                  alert('Ошибка: комментарий имеет некорректную структуру.');
-                  return;
-                }
                 editingComment = commentGroup;
                 document.getElementById('comment-modal').classList.remove('hidden');
                 document.getElementById('comment-author').value = authorText.text().replace(/ \(.*\)/, '');
@@ -1340,10 +1344,15 @@ async function loadBoardUsers() {
               });
 
               commentGroup.on('transform', function() {
-                bg.width(commentGroup.width() / commentGroup.scaleX());
-                bg.height(commentGroup.height() / commentGroup.scaleY());
+                const scaleX = commentGroup.scaleX();
+                const scaleY = commentGroup.scaleY();
+                bg.width(commentGroup.width() / scaleX);
+                bg.height(commentGroup.height() / scaleY);
                 authorText.width(bg.width() - 20);
                 contentText.width(bg.width() - 20);
+                commentGroup.scaleX(1);
+                commentGroup.scaleY(1);
+                saveBoard();
               });
               commentGroup.on('dragend', saveBoard);
             }
@@ -1433,12 +1442,6 @@ async function loadBoardUsers() {
               canvases[role].add(textGroup);
 
               textGroup.on('dblclick', function() {
-                const textNodes = textGroup.find('.Text');
-                if (textNodes.length < 1) {
-                  console.error('Invalid text:', textGroup.id(), textNodes.length);
-                  alert('Ошибка: текст имеет некорректную структуру.');
-                  return;
-                }
                 editingText = textGroup;
                 document.getElementById('text-modal').classList.remove('hidden');
                 document.getElementById('text-content').value = contentText.text();
@@ -1446,9 +1449,14 @@ async function loadBoardUsers() {
               });
 
               textGroup.on('transform', function() {
-                bg.width(textGroup.width() / textGroup.scaleX());
-                bg.height(textGroup.height() / textGroup.scaleY());
+                const scaleX = textGroup.scaleX();
+                const scaleY = textGroup.scaleY();
+                bg.width(textGroup.width() / scaleX);
+                bg.height(textGroup.height() / scaleY);
                 contentText.width(bg.width() - 20);
+                textGroup.scaleX(1);
+                textGroup.scaleY(1);
+                saveBoard();
               });
               textGroup.on('dragend', saveBoard);
             }
@@ -1476,7 +1484,6 @@ async function loadBoardUsers() {
                 return;
               }
 
-              console.log('Deleting:', contextTarget.id(), contextTarget.name());
               contextTarget.destroy();
               transformer.nodes([]);
               stage.batchDraw();
@@ -1495,13 +1502,13 @@ async function loadBoardUsers() {
             } else {
               adminPanel.classList.remove('slide-in', 'open');
             }
-            sidebar.classList.remove('open', 'slide-in');
+            sidebar.classList.remove('open');
+            sidebar.style.left = '-256px';
           });
 
           document.getElementById('generate-link').addEventListener('click', function() {
             const link = `https://app.example.com/invite/${currentBoardId}`;
             document.getElementById('invite-link').value = link;
-            console.log('Generated invite link:', link);
           });
 
           document.getElementById('add-role').addEventListener('click', async function() {
@@ -1527,7 +1534,6 @@ async function loadBoardUsers() {
             document.getElementById('role-input').value = '';
             document.getElementById('user-select').value = '';
             await saveBoard();
-            console.log('Added role:', roleInput, 'assigned to:', userUid);
           });
 
           let scale = 1;
@@ -1612,11 +1618,10 @@ async function loadBoardUsers() {
           });
 
           window.addEventListener('resize', function() {
-            stage.width(window.innerWidth - (window.innerWidth <= 768 ? 0 : 256));
+            stage.width(window.innerWidth);
             stage.height(window.innerHeight);
             updateGrid();
             stage.batchDraw();
-            console.log('Resized canvas');
           });
         }
       } catch (error) {
