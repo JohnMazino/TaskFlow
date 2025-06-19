@@ -448,21 +448,24 @@
           }
         }
 
-        async function loadBoardUsers() {
-          const userSelect = document.getElementById('user-select');
-          userSelect.innerHTML = '<option value="">Выберите пользователя</option>';
-          const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
-          if (boardDoc.exists()) {
-            const users = boardDoc.data().users || [];
-            for (const uid of users) {
-              const user = await auth.getUser(uid).catch(function() { return null; });
-              const option = document.createElement('option');
-              option.value = uid;
-              option.textContent = user ? (user.displayName || user.email || uid) : uid;
-              userSelect.appendChild(option);
-            }
-          }
-        }
+async function loadBoardUsers() {
+  const userSelect = document.getElementById('user-select');
+  userSelect.innerHTML = '<option value="">Выберите пользователя</option>';
+  const boardDoc = await getDoc(doc(db, 'boards', currentBoardId));
+  if (boardDoc.exists()) {
+    const users = boardDoc.data().users || [];
+    for (const uid of users) {
+      // Вместо auth.getUser используем Firestore для получения данных пользователя
+      const userDoc = await getDoc(doc(db, 'users', uid)).catch(() => null);
+      const userData = userDoc?.exists() ? userDoc.data() : null;
+      const displayName = userData?.displayName || userData?.email || uid;
+      const option = document.createElement('option');
+      option.value = uid;
+      option.textContent = displayName;
+      userSelect.appendChild(option);
+    }
+  }
+}
 
         async function initBoard() {
           if (unsubscribeBoardSnapshot) unsubscribeBoardSnapshot();
