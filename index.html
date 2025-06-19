@@ -5,35 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Доска управления задачами</title>
   <link rel="icon" href="data:,">
-    <script src="https://unpkg.com/konva@8.3.5/konva.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <style>
-      @keyframes slide-in {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-      }
-      @keyframes fade-in {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .slide-in { animation: slide-in 0.3s ease-out; }
-      .fade-in { animation: fade-in 0.3s ease-out; }
-      .card-hover:hover { transform: scale(1.02); transition: transform 0.2s ease; }
-      #admin-panel, #auth-panel, #board-panel { z-index: 1000; }
-      #canvas-container { position: relative; overflow: hidden; width: 100%; height: 100%; }
-      .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
-      .modal-content { background: #1a202c; padding: 4px; border-radius: 8px; width: 90%; max-width: 400px; }
-      @media (max-width: 600px) {
-        #sidebar { width: 100%; position: fixed; top: 0; left: 0; z-index: 1500; }
-        #canvas-container { width: 100%; height: calc(100vh - 48px); }
-        .modal-content { width: 95%; padding: 10px; }
-        #admin-panel { width: 100%; height: 100%; position: fixed; top: 0; right: 0; }
-      }
-    </style>
+  <script src="https://unpkg.com/konva@8.3.5/konva.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <style>
+    @keyframes slide-in {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .slide-in { animation: slide-in 0.3s ease-out; }
+    .fade-in { animation: fade-in 0.3s ease-out; }
+    .card-hover:hover { transform: scale(1.02); transition: transform 0.2s ease; }
+    #admin-panel, #auth-panel, #board-panel { z-index: 1000; }
+    #canvas-container { position: relative; overflow: hidden; width: 100%; height: 100%; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+    .modal-content { background: #1a202c; padding: 4px; border-radius: 8px; width: 90%; max-width: 400px; }
+    @media (max-width: 600px) {
+      #sidebar { width: 100%; position: fixed; top: 0; left: 0; z-index: 1500; }
+      #canvas-container { width: 100%; height: calc(100vh - 48px); }
+      .modal-content { width: 95%; padding: 10px; }
+      #admin-panel { width: 100%; height: 100%; position: fixed; top: 0; right: 0; }
+    }
+  </style>
 </head>
 <body class="min-h-screen bg-gray-900 text-white overflow-hidden">
   <!-- Панель авторизации -->
@@ -67,7 +67,7 @@
 
   <!-- Боковая панель -->
   <div id="sidebar" style="display: none;" class="w-full bg-gray-800 p-4 flex flex-col sm:w-64 min-h-screen slide-in">
-    <h2 class="text-lg font-semibold mb-4 sm:text-xl">Роли и холсты</h2>
+    <h2 class="text-lg font-semibold mb-4 sm:text-xl">Холсты</h2>
     <ul id="roles-list" class="space-y-2"></ul>
     <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition text-sm sm:text-base">Админ-панель</button>
     <button id="logout-btn" class="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition text-sm sm:text-base">Выйти</button>
@@ -349,30 +349,32 @@
         const boardName = prompt('Введите название доски:');
         if (!boardName) return;
 
+        console.log('Создание доски:', boardName, 'Пользователь:', currentUser.uid);
         const boardRef = await db.collection('boards').add({
           name: boardName,
           inviteLink: '',
-          roles: { 'Common': { readOnly: false }, 'User': { readOnly: false } },
-          members: { [currentUser.uid]: { role: 'User', displayName: currentUser.displayName || currentUser.email } }
+          roles: { 'Common': { readOnly: false } }, // Только Common холст
+          members: { [currentUser.uid]: { role: 'Common', displayName: currentUser.displayName || currentUser.email } }
         });
 
+        console.log('Доска успешно создана, ID:', boardRef.id);
         const boardId = boardRef.id;
         const inviteLink = `${window.location.origin}/join/${boardId}`;
         await boardRef.update({ inviteLink });
 
         currentBoardId = boardId;
         isAdmin = false;
-        userRole = 'User';
-        boardRoles = { 'Common': { readOnly: false }, 'User': { readOnly: false } };
+        userRole = 'Common';
+        boardRoles = { 'Common': { readOnly: false } };
 
         boardPanel.style.display = 'none';
         sidebar.style.display = 'flex';
         canvasContainer.style.display = 'flex';
         initBoard();
-        console.log('Доска создана:', boardId);
+        console.log('Доска инициализирована:', boardId);
       } catch (error) {
-        console.error('Ошибка создания доски:', error);
-        alert('Ошибка создания доски');
+        console.error('Ошибка создания доски:', error, 'Код ошибки:', error.code, 'Сообщение:', error.message);
+        alert('Ошибка создания доски: ' + error.message);
       }
     });
 
@@ -394,12 +396,12 @@
 
         const boardData = boardDoc.data();
         await db.collection('boards').doc(boardId).update({
-          [`members.${currentUser.uid}`]: { role: 'User', displayName: currentUser.displayName || currentUser.email }
+          [`members.${currentUser.uid}`]: { role: 'Common', displayName: currentUser.displayName || currentUser.email }
         });
 
         currentBoardId = boardId;
         isAdmin = false;
-        userRole = 'User';
+        userRole = 'Common';
         boardRoles = boardData.roles;
 
         boardPanel.style.display = 'none';
@@ -440,9 +442,6 @@
         stage.add(transformerLayer);
 
         canvases = { 'Common': new Konva.Layer() };
-        Object.keys(boardRoles).forEach(role => {
-          if (role !== 'Common') canvases[role] = new Konva.Layer();
-        });
         stage.add(canvases[currentCanvas]);
 
         loadVisibleElements();
@@ -466,16 +465,20 @@
         const yMin = -pos.y / scale - height / 2;
         const yMax = yMin + height;
 
+        // Запрос только по x
         const snapshot = await db.collection(`boards/${currentBoardId}/elements`)
           .where('x', '>=', xMin)
           .where('x', '<=', xMax)
-          .where('y', '>=', yMin)
-          .where('y', '<=', yMax)
           .get();
+
+        // Фильтрация по y на клиентской стороне
         snapshot.forEach(doc => {
           const data = doc.data();
           const elementId = doc.id;
           const role = data.role || 'Common';
+
+          // Пропускаем элементы, не попадающие в видимую область по y
+          if (data.y < yMin || data.y > yMax) return;
           if (!canvases[role]) return;
 
           const existing = canvases[role].findOne(`#${elementId}`);
@@ -639,34 +642,27 @@
 
     // Проверка возможности редактирования роли
     function isEditable(role) {
-      return role === 'Common' || role === userRole;
+      return role === 'Common';
     }
 
     // Обновление списка ролей
     function updateRolesList() {
       try {
         rolesList.innerHTML = '';
-        const allRoles = ['Common', ...Object.keys(boardRoles)];
-        allRoles.forEach(role => {
-          const li = document.createElement('li');
-          li.className = `p-2 rounded cursor-pointer transition bg-gray-700 hover:bg-gray-600 ${role === currentCanvas ? 'bg-blue-600' : ''} fade-in`;
-          li.textContent = role;
-          li.addEventListener('click', () => {
-            if (!canvases[role]) {
-              canvases[role] = new Konva.Layer();
-              loadVisibleElements();
-            }
-            currentCanvas = role;
-            stage.getLayers().forEach(layer => {
-              if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
-            });
-            stage.add(canvases[role]);
-            stage.batchDraw();
-            updateRolesList();
-            console.log(`Переключено на холст: ${role}`);
+        const li = document.createElement('li');
+        li.className = `p-2 rounded cursor-pointer transition bg-gray-700 hover:bg-gray-600 bg-blue-600 fade-in`;
+        li.textContent = 'Common';
+        li.addEventListener('click', () => {
+          currentCanvas = 'Common';
+          stage.getLayers().forEach(layer => {
+            if (layer !== backgroundLayer && layer !== transformerLayer) layer.remove();
           });
-          rolesList.appendChild(li);
+          stage.add(canvases['Common']);
+          stage.batchDraw();
+          updateRolesList();
+          console.log('Переключено на холст: Common');
         });
+        rolesList.appendChild(li);
         updateTaskRoleSelect();
         updateAdminPanel();
       } catch (error) {
@@ -678,15 +674,7 @@
     function updateTaskRoleSelect() {
       try {
         const taskRoleSelect = document.getElementById('task-role');
-        taskRoleSelect.innerHTML = '<option value="">Выберите роль</option>';
-        ['Common', userRole].forEach(role => {
-          if (role) {
-            const option = document.createElement('option');
-            option.value = role;
-            option.textContent = role;
-            taskRoleSelect.appendChild(option);
-          }
-        });
+        taskRoleSelect.innerHTML = '<option value="Common">Common</option>';
       } catch (error) {
         console.error('Ошибка обновления селекта ролей:', error);
       }
@@ -962,46 +950,46 @@
         // Сохранение заметки
         document.getElementById('save-note').addEventListener('click', async () => {
           try {
-            const title = document.getElementById('note-title').value.trim();
-            const content = document.getElementById('note-content').value.trim();
-            const role = currentCanvas;
+              const title = document.getElementById('note-title').value.trim();
+              const content = document.getElementById('note-content').value.trim();
+              const role = currentCanvas;
 
-            if (!title || !content) {
-              alert('Заполните заголовок и содержимое');
-              return;
+              if (!title || !content) {
+                alert('Заполните заголовок и содержимое');
+                return;
+              }
+
+              if (!isEditable(role)) {
+                alert('Нет прав на редактирование');
+                return;
+              }
+
+              const noteData = {
+                type: 'note',
+                role,
+                x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
+                y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
+                width: 150,
+                height: 120,
+                bgFill: '#ffffff',
+                title,
+                content,
+                createdBy: currentUser.uid
+              };
+
+              if (editingTask) {
+                await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(noteData);
+                editingTask = null;
+              } else {
+                await db.collection(`boards/${currentBoardId}/elements`).add(noteData);
+              }
+
+              document.getElementById('note-modal').style.display = 'none';
+              document.getElementById('note-title').value = '';
+              document.getElementById('note-content').value = '';
+            } catch (error) {
+              console.error('Ошибка сохранения заметки:', error);
             }
-
-            if (!isEditable(role)) {
-              alert('Нет прав на редактирование');
-              return;
-            }
-
-            const noteData = {
-              type: 'note',
-              role,
-              x: contextPos.x / stage.scaleX() - stage.x() / stage.scaleX(),
-              y: contextPos.y / stage.scaleY() - stage.y() / stage.scaleY(),
-              width: 150,
-              height: 120,
-              bgFill: '#ffffff',
-              title,
-              content,
-              createdBy: currentUser.uid
-            };
-
-            if (editingTask) {
-              await db.collection(`boards/${currentBoardId}/elements`).doc(editingTask.id()).update(noteData);
-              editingTask = null;
-            } else {
-              await db.collection(`boards/${currentBoardId}/elements`).add(noteData);
-            }
-
-            document.getElementById('note-modal').style.display = 'none';
-            document.getElementById('note-title').value = '';
-            document.getElementById('note-content').value = '';
-          } catch (error) {
-            console.error('Ошибка сохранения заметки:', error);
-          }
         });
 
         // Создание комментария
