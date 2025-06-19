@@ -28,33 +28,45 @@
     body { background-color: #1f2937; color: #ffffff; }
     #admin-panel, #auth-modal { z-index: 30; }
     #canvas-container { position: relative; overflow: hidden; }
-    #sidebar-toggle { position: absolute; top: 10px; left: 10px; z-index: 40; }
+    #sidebar {
+      width: 256px;
+      height: 100%;
+      position: fixed;
+      top: 0;
+      left: 0;
+      transition: width 0.3s ease;
+      z-index: 40;
+    }
+    #sidebar.collapsed { width: 60px; }
+    #sidebar.collapsed #roles-list li span, #sidebar.collapsed h2, #sidebar.collapsed #toggle-admin, #sidebar.collapsed #logout {
+      display: none;
+    }
+    #sidebar-toggle-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 50;
+    }
     @media (max-width: 768px) {
-      #sidebar { width: 256px; height: 100%; position: fixed; top: 0; left: -256px; transition: left 0.3s ease; z-index: 40; }
+      #sidebar { width: 256px; left: -256px; }
       #sidebar.open { left: 0; }
       #admin-panel { width: 80%; transform: translateX(100%); transition: transform 0.3s ease; }
       #admin-panel.open { transform: translateX(0); }
-      #canvas-container { width: 100%; }
+      #canvas-container { width: 100%; margin-left: 0; }
       .modal-content { width: 90%; max-width: 400px; }
       #context-menu { width: 150px; font-size: 14px; }
       input, textarea, select { font-size: 14px; }
     }
     @media (min-width: 769px) {
-      #sidebar { width: 256px; position: fixed; left: -256px; transition: left 0.3s ease; }
-      #sidebar.open { left: 0; }
-      #admin-panel { width: 320px; transform: none; }
-      #sidebar-toggle { display: block; }
+      #canvas-container { margin-left: 256px; }
+      #sidebar.collapsed + #canvas-container { margin-left: 60px; }
     }
   </style>
 </head>
 <body class="flex h-screen overflow-hidden">
-  <!-- Кнопка переключения боковой панели -->
-  <button id="sidebar-toggle" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
-    ☰
-  </button>
-
   <!-- Боковая панель -->
   <div id="sidebar" class="bg-gray-800 p-4 flex flex-col">
+    <button id="sidebar-toggle-btn" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">↔</button>
     <h2 class="text-xl font-bold mb-4">Роли</h2>
     <ul id="roles-list" class="space-y-2 flex-1"></ul>
     <button id="toggle-admin" class="mt-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition hidden">Админ-панель</button>
@@ -207,7 +219,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
-    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, setDoc, arrayUnion, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+    import { getFirestore, collection, doc, addDoc, getDoc, setDoc, updateDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAdPjUWf2gkcZxOAkQb-3hkjKtuETOVRhc",
@@ -240,7 +252,7 @@
         const emailInput = document.getElementById('email-input');
         const passwordInput = document.getElementById('password-input');
         const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
 
         function toggleAuthModeUI() {
           isSignInMode = !isSignInMode;
@@ -298,6 +310,7 @@
             document.getElementById('canvas-container').classList.remove('hidden');
             sidebar.classList.add('open');
             document.getElementById('comment-author').value = user.displayName || user.email || 'Пользователь';
+            await ensureUserDocument();
             await loadUserBoard();
           } else {
             authModal.classList.remove('hidden');
@@ -333,16 +346,25 @@
           }
         });
 
-        sidebarToggle.addEventListener('click', function() {
-          if (sidebar.classList.contains('open')) {
+        sidebarToggleBtn.addEventListener('click', function() {
+          sidebar.classList.toggle('collapsed');
+          if (sidebar.classList.contains('collapsed')) {
             sidebar.classList.remove('open');
-            sidebar.style.left = '-256px';
           } else {
             sidebar.classList.add('open');
-            sidebar.style.left = '0';
-            document.getElementById('admin-panel').classList.remove('open', 'slide-in');
           }
         });
+
+        async function ensureUserDocument() {
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (!userDoc.exists()) {
+            await setDoc(userDocRef, {
+              email: currentUser.email,
+              displayName: currentUser.displayName || currentUser.email.split('@')[0]
+            });
+          }
+        }
 
         async function loadUserBoard() {
           try {
@@ -694,7 +716,7 @@
             allCanvases.forEach(function(role) {
               const li = document.createElement('li');
               li.className = `p-2 rounded cursor-pointer transition ${role === currentCanvas ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} fade-in`;
-              li.textContent = role;
+              li.innerHTML = `<span>${role}</span>`;
               li.addEventListener('click', function() {
                 if (!canvases[role]) canvases[role] = new Konva.Layer();
                 currentCanvas = role;
@@ -1503,7 +1525,7 @@
               adminPanel.classList.remove('slide-in', 'open');
             }
             sidebar.classList.remove('open');
-            sidebar.style.left = '-256px';
+            sidebar.classList.add('collapsed');
           });
 
           document.getElementById('generate-link').addEventListener('click', function() {
