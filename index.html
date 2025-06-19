@@ -87,10 +87,27 @@
   <!-- Модальное окно аутентификации -->
   <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
     <div class="bg-gray-800 p-6 rounded-lg w-96 modal-content fade-in">
-      <h3 class="text-lg font-bold mb-4">Вход в приложение</h3>
-      <button id="google-signin" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full flex items-center justify-center">
-        <img src="https://www.google.com/favicon.ico" class="w-5 h-5 mr-2" alt="Google"> Войти через Google
-      </button>
+      <h3 id="auth-title" class="text-lg font-bold mb-4">Вход в приложение</h3>
+      <div id="auth-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium">Email</label>
+          <input id="email-input" type="email" placeholder="Введите email" class="w-full bg-gray-700 p-2 rounded">
+        </div>
+        <div>
+          <label class="block text-sm font-medium">Пароль</label>
+          <input id="password-input" type="password" placeholder="Введите пароль" class="w-full bg-gray-700 p-2 rounded">
+        </div>
+        <div class="flex justify-between">
+          <button id="auth-submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full">Войти</button>
+        </div>
+        <div class="flex justify-between">
+          <button id="toggle-auth-mode" class="text-blue-400 hover:underline">Нет аккаунта? Зарегистрируйтесь</button>
+          <button id="google-signin" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center">
+            <img src="https://www.google.com/favicon.ico" class="w-5 h-5 mr-2" alt="Google"> Google
+          </button>
+        </div>
+        <div id="auth-error" class="text-red-500 text-sm hidden"></div>
+      </div>
     </div>
   </div>
 
@@ -195,8 +212,8 @@
   <script type="module">
     // Импорт Firebase SDK
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
-    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+    import { getFirestore, collection, doc, addDoc, getDoc, updateDoc, query, where, getDocs, arrayUnion } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
 
     // Firebase Config
     const firebaseConfig = {
@@ -215,6 +232,7 @@
     const db = getFirestore(app);
     let currentUser = null;
     let currentBoardId = null;
+    let isSignInMode = true;
 
     window.onload = async () => {
       console.log('DOM loaded, initializing app...');
@@ -222,17 +240,85 @@
         if (!window.Konva) throw new Error('Konva.js not loaded');
         if (!window.jspdf) throw new Error('jsPDF not loaded');
 
+        // Настройка модального окна аутентификации
+        const authModal = document.getElementById('auth-modal');
+        const authTitle = document.getElementById('auth-title');
+        const authSubmit = document.getElementById('auth-submit');
+        const toggleAuthMode = document.getElementById('toggle-auth-mode');
+        const authError = document.getElementById('auth-error');
+        const emailInput = document.getElementById('email-input');
+        const passwordInput = document.getElementById('password-input');
+
+        function toggleAuthModeUI() {
+          isSignInMode = !isSignInMode;
+          authTitle.textContent = isSignInMode ? 'Вход в приложение' : 'Регистрация';
+          authSubmit.textContent = isSignInMode ? 'Войти' : 'Зарегистрироваться';
+          toggleAuthMode.textContent = isSignInMode ? 'Нет аккаунта? Зарегистрируйтесь' : 'Уже есть аккаунт? Войдите';
+          authError.classList.add('hidden');
+          emailInput.value = '';
+          passwordInput.value = '';
+        }
+
+        toggleAuthMode.addEventListener('click', toggleAuthModeUI);
+
+        // Вход или регистрация по email/пароль
+        authSubmit.addEventListener('click', async () => {
+          const email = emailInput.value.trim();
+          const password = passwordInput.value.trim();
+          authError.classList.add('hidden');
+
+          if (!email || !password) {
+            authError.textContent = 'Введите email и пароль';
+            authError.classList.remove('hidden');
+            return;
+          }
+
+          try {
+            if (isSignInMode) {
+              await signInWithEmailAndPassword(auth, email, password);
+              console.log('User signed in with email:', email);
+            } else {
+              await createUserWithEmailAndPassword(auth, email, password);
+              console.log('User registered with email:', email);
+            }
+          } catch (error) {
+            let errorMessage = 'Произошла ошибка';
+            switch (error.code) {
+              case 'auth/invalid-email':
+                errorMessage = 'Неверный формат email';
+                break;
+              case 'auth/user-not-found':
+                errorMessage = 'Пользователь не найден';
+                break;
+              case 'auth/wrong-password':
+                errorMessage = 'Неверный пароль';
+                break;
+              case 'auth/email-already-in-use':
+                errorMessage = 'Email уже используется';
+                break;
+              case 'auth/weak-password':
+                errorMessage = 'Пароль должен содержать не менее 6 символов';
+                break;
+              default:
+                errorMessage = error.message;
+            }
+            authError.textContent = errorMessage;
+            authError.classList.remove('hidden');
+            console.error('Auth error:', error);
+          }
+        });
+
         // Проверка аутентификации
         onAuthStateChanged(auth, user => {
           if (user) {
             currentUser = user;
-            document.getElementById('auth-modal').classList.add('hidden');
+            authModal.classList.add('hidden');
             document.getElementById('board-modal').classList.remove('hidden');
-            document.getElementById('comment-author').value = user.displayName || 'Пользователь';
+            document.getElementById('comment-author').value = user.displayName || user.email || 'Пользователь';
             loadUserBoards();
-            console.log('User signed in:', user.displayName);
+            console.log('User signed in:', user.email || user.displayName);
           } else {
-            document.getElementById('auth-modal').classList.remove('hidden');
+            authModal.classList.remove('hidden');
             document.getElementById('board-modal').classList.add('hidden');
             document.getElementById('canvas-container').classList.add('hidden');
             document.getElementById('sidebar').classList.add('hidden');
@@ -246,8 +332,9 @@
             const provider = new GoogleAuthProvider();
             await signInWithPopup(auth, provider);
           } catch (error) {
-            console.error('Error signing in:', error);
-            alert('Ошибка входа: ' + error.message);
+            authError.textContent = error.message;
+            authError.classList.remove('hidden');
+            console.error('Error signing in with Google:', error);
           }
         });
 
@@ -909,38 +996,38 @@
             }
           });
 
-          document.getElementById('export-board').addEventListener('click', async () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            let yOffset = 10;
-            Object.keys(canvases).forEach(role => {
-              doc.text(`Роль: ${role}`, 10, yOffset);
-              yOffset += 10;
-              canvases[role].find('.Group').forEach(group => {
-                const texts = group.find('.Text').map(text => text.text());
-                doc.text(`${group.name()}:`, 10, yOffset);
-                yOffset += 10;
-                texts.forEach(text => {
-                  doc.text(text, 15, yOffset);
-                  yOffset += 10;
-                });
-                if (group.name() === 'pdf') {
-                  group.find('.task').forEach(task => {
-                    const taskTexts = task.find('.Text').map(t => t.text());
-                    doc.text('Задача в PDF:', 15, yOffset);
-                    yOffset += 10;
-                    taskTexts.forEach(t => {
-                      doc.text(t, 20, yOffset);
-                      yOffset += 10;
-                    });
-                  });
-                }
-                yOffset += 10;
-              });
-            });
-            doc.save(`board_${currentBoardId}.pdf`);
-            console.log('Exported board:', currentBoardId);
+document.getElementById('export-board').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let yOffset = 10;
+  Object.keys(canvases).forEach(role => {
+    doc.text(`Роль: ${role}`, 10, yOffset);
+    yOffset += 10;
+    canvases[role].find('.Group').forEach(group => {
+      const texts = group.find('.Text').map(text => text.text());
+      doc.text(`${group.name()}:`, 10, yOffset);
+      yOffset += 10;
+      texts.forEach(text => {
+        doc.text(text, 15, yOffset);
+        yOffset += 10;
+      });
+      if (group.name() === 'pdf') {
+        group.find('.task').forEach(task => {
+          const taskTexts = task.find('.Text').map(t => t.text());
+          doc.text('Задача в PDF:', 15, yOffset);
+          yOffset += 10;
+          taskTexts.forEach(t => {
+            doc.text(t, 20, yOffset);
+            yOffset += 10;
           });
+        });
+      }
+      yOffset += 10;
+    });
+  });
+  doc.save(`board_${currentBoardId}.pdf`);
+  console.log('Exported board:', currentBoardId);
+});
 
           let editingNote = null;
           document.getElementById('create-note').addEventListener('click', () => {
@@ -1073,7 +1160,7 @@
           document.getElementById('create-comment').addEventListener('click', () => {
             contextMenu.classList.add('hidden');
             document.getElementById('comment-modal').classList.remove('hidden');
-            document.getElementById('comment-author').value = currentUser.displayName || 'Пользователь';
+            document.getElementById('comment-author').value = currentUser.displayName || currentUser.email || 'Пользователь';
             document.getElementById('comment-content').value = '';
             editingComment = null;
           });
